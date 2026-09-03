@@ -1,6 +1,13 @@
 :root{
-  --bg:#f7f6f2;--card:#fff;--text:#171717;--muted:#6c6c6c;--line:#e8e6df;
-  --accent:#111;--soft:#f1efe8;--radius:24px;--shadow:0 12px 40px rgba(0,0,0,.06);
+  --bg:#f7f6f2;
+  --card:#ffffff;
+  --text:#171717;
+  --muted:#6c6c6c;
+  --line:#e8e6df;
+  --accent:#111111;
+  --soft:#f1efe8;
+  --radius:24px;
+  --shadow:0 12px 40px rgba(0,0,0,.06);
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}

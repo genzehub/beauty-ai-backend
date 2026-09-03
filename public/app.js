@@ -1,12 +1,10 @@
 // GENZE AI frontend
-// IMPORTANT: never put a YouCam secret/API key in this browser file.
-// Point ANALYSIS_ENDPOINT to your own secure serverless/backend route.
 const CONFIG = {
   ANALYSIS_ENDPOINT: "/api/skin-analysis",
   PRODUCT_ENDPOINT: "/api/match-products"
 };
 
-const $ = (id) => document.getElementById(id);
+const $ = id => document.getElementById(id);
 const cameraShell = $("cameraShell");
 const video = $("cameraVideo");
 const canvas = $("captureCanvas");
@@ -18,12 +16,13 @@ const productResults = $("productResults");
 let stream = null;
 let requestSequence = 0;
 
-function setStatus(text, show=true){
+function setStatus(text, show = true) {
   statusBox.textContent = text;
   statusBox.classList.toggle("hidden", !show);
 }
-function resetAnalysis(){
-  requestSequence += 1; // invalidates older in-flight responses
+
+function resetAnalysis() {
+  requestSequence++;
   results.classList.add("hidden");
   concernChips.innerHTML = "";
   productResults.innerHTML = "";
@@ -31,143 +30,198 @@ function resetAnalysis(){
   preview.removeAttribute("src");
   setStatus("", false);
 }
-function requireConsent(){
-  if(!$("consentCheckbox").checked){
+
+function requireConsent() {
+  if (!$("consentCheckbox").checked) {
     alert("Please tick the consent box before taking or uploading a photo.");
     return false;
   }
   return true;
 }
-async function openCamera(){
-  if(!requireConsent()) return;
+
+async function openCamera() {
+  if (!requireConsent()) return;
   resetAnalysis();
-  try{
+  try {
     stream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: "user",
-        width: {ideal: 1920},
-        height: {ideal: 1080}
+        width: { ideal: 1920, min: 1280 },
+        height: { ideal: 1080, min: 720 }
       },
-      audio:false
+      audio: false
     });
     video.srcObject = stream;
+    await video.play();
     cameraShell.classList.remove("hidden");
-  }catch(err){
+  } catch (err) {
     console.error(err);
     alert("Camera permission was blocked or unavailable. Please allow camera access, or use Upload Photo.");
   }
 }
-function closeCamera(){
-  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+
+function closeCamera() {
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
+  }
   video.srcObject = null;
   cameraShell.classList.add("hidden");
 }
-function capturePhoto(){
-  if(!video.videoWidth) return;
-  const w = video.videoWidth, h = video.videoHeight;
-  canvas.width = w; canvas.height = h;
+
+function capturePhoto() {
+  if (!video.videoWidth || !video.videoHeight) {
+    alert("Camera is still starting. Try again in a moment.");
+    return;
+  }
+
+  const w = video.videoWidth;
+  const h = video.videoHeight;
+  if (w < 640 || h < 480) {
+    alert("Camera resolution is too low. Use Upload Photo or a higher-resolution camera.");
+    return;
+  }
+
+  canvas.width = w;
+  canvas.height = h;
   const ctx = canvas.getContext("2d");
-  ctx.translate(w,0);
-  ctx.scale(-1,1);
-  ctx.drawImage(video,0,0,w,h);
-  canvas.toBlob(blob=>{
-    if(!blob) return;
+  ctx.save();
+  ctx.translate(w, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, 0, 0, w, h);
+  ctx.restore();
+
+  canvas.toBlob(blob => {
+    if (!blob) return;
     closeCamera();
     showPreviewAndAnalyze(blob);
-  },"image/jpeg",0.92);
+  }, "image/jpeg", 0.95);
 }
-function fileToBlob(file){ return file; }
 
-async function showPreviewAndAnalyze(blob){
+async function showPreviewAndAnalyze(blob) {
   resetAnalysis();
   const seq = requestSequence;
   preview.src = URL.createObjectURL(blob);
   preview.classList.remove("hidden");
   setStatus("Analyzing your photo…");
-  try{
-    const analysis = await analyzeSkin(blob);
-    if(seq !== requestSequence) return;
-    setStatus("Analysis complete.");
+
+  let analysis = { concerns: [] };
+
+  try {
+    analysis = await analyzeSkin(blob);
+    if (seq !== requestSequence) return;
+    setStatus("Analysis complete. Finding your matches…");
     renderAnalysis(analysis);
+  } catch (err) {
+    console.error(err);
+    if (seq !== requestSequence) return;
+    setStatus("Photo analysis needs a clearer/closer face. Showing Genze Hub recommendations instead…");
+    renderAnalysis(analysis);
+  }
+
+  try {
     const products = await matchProducts(analysis);
-    if(seq !== requestSequence) return;
+    if (seq !== requestSequence) return;
     renderProducts(products);
     results.classList.remove("hidden");
-  }catch(err){
+    setStatus("Your matches are ready.");
+  } catch (err) {
     console.error(err);
-    setStatus("Analysis could not be completed. Check the secure API endpoint and try again.");
+    setStatus("Products could not be loaded. Check the Shopify connection on the server.");
   }
 }
 
-async function analyzeSkin(blob){
+async function analyzeSkin(blob) {
   const fd = new FormData();
   fd.append("photo", blob, "capture.jpg");
-  const r = await fetch(CONFIG.ANALYSIS_ENDPOINT,{method:"POST",body:fd});
-  if(!r.ok) throw new Error("Analysis API error: "+r.status);
-  return await r.json();
+  const r = await fetch(CONFIG.ANALYSIS_ENDPOINT, { method: "POST", body: fd });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data?.error || `Analysis API error: ${r.status}`);
+  return data;
 }
 
-async function matchProducts(analysis){
-  const r = await fetch(CONFIG.PRODUCT_ENDPOINT,{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({analysis})
+async function matchProducts(analysis = {}) {
+  const tone = $("toneInput")?.value?.trim() || "";
+  const r = await fetch(CONFIG.PRODUCT_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ analysis, tone })
   });
-  if(!r.ok) throw new Error("Product matching API error: "+r.status);
-  return await r.json();
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data?.error || `Product matching API error: ${r.status}`);
+  return data;
 }
-function normalizeConcerns(analysis){
+
+function normalizeConcerns(analysis) {
   const items = Array.isArray(analysis?.concerns) ? analysis.concerns : [];
   return items.map(x => typeof x === "string" ? x : x?.type).filter(Boolean);
 }
-function renderAnalysis(analysis){
+
+function renderAnalysis(analysis) {
   const concerns = normalizeConcerns(analysis);
   concernChips.innerHTML = concerns.length
-    ? concerns.map(c=>`<span class="chip">${escapeHtml(c)}</span>`).join("")
-    : `<span class="chip">Analysis received</span>`;
+    ? concerns.map(c => `<span class="chip">${escapeHtml(c)}</span>`).join("")
+    : `<span class="chip">Recommendations ready</span>`;
 }
-function renderProducts(products){
+
+function renderProducts(products) {
   const list = Array.isArray(products) ? products : products?.products || [];
-  productResults.innerHTML = list.length ? list.map(p=>`
+  productResults.innerHTML = list.length ? list.map(p => `
     <article class="product">
-      <h4>${escapeHtml(p.title || p.name || "Recommended product")}</h4>
-      <p>${escapeHtml(p.why || p.reason || "Matched to your analysis")}</p>
+      ${p.image ? `<img src="${safeUrl(p.image)}" alt="${escapeHtml(p.title || "Product")}" loading="lazy">` : ""}
+      <h4>${escapeHtml(p.title || "Recommended product")}</h4>
+      ${p.price ? `<p><strong>${escapeHtml(p.currency || "")} ${escapeHtml(p.price)}</strong></p>` : ""}
+      <p>${escapeHtml(p.why || "Matched to your analysis")}</p>
       <a href="${safeUrl(p.url || "https://genzehub.co.in")}" target="_blank" rel="noreferrer">View product ↗</a>
-    </article>`).join("") : `<p>No strong matches found. Try another clear, front-facing photo.</p>`;
+    </article>`).join("")
+    : `<p>No products were returned from Shopify.</p>`;
 }
-function escapeHtml(v=""){
-  return String(v).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+
+function escapeHtml(v = "") {
+  return String(v).replace(/[&<>"']/g, m => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+  }[m]));
 }
-function safeUrl(v){ try{ const u=new URL(v,location.origin); return ["http:","https:"].includes(u.protocol)?u.href:"#"; }catch{return "#";} }
 
-$("openCameraBtn").addEventListener("click", openCamera);
-$("closeCameraBtn").addEventListener("click", closeCamera);
-$("captureBtn").addEventListener("click", capturePhoto);
-$("uploadInput").addEventListener("change", e=>{
-  if(!requireConsent()){ e.target.value=""; return; }
-  const file=e.target.files?.[0];
-  if(file) showPreviewAndAnalyze(fileToBlob(file));
+function safeUrl(v) {
+  try {
+    const u = new URL(v, location.origin);
+    return ["http:", "https:"].includes(u.protocol) ? u.href : "#";
+  } catch {
+    return "#";
+  }
+}
+
+$("openCameraBtn")?.addEventListener("click", openCamera);
+$("closeCameraBtn")?.addEventListener("click", closeCamera);
+$("captureBtn")?.addEventListener("click", capturePhoto);
+$("uploadInput")?.addEventListener("change", e => {
+  if (!requireConsent()) { e.target.value = ""; return; }
+  const file = e.target.files?.[0];
+  if (file) showPreviewAndAnalyze(file);
 });
 
-document.querySelectorAll("[data-tone]").forEach(btn=>{
-  btn.addEventListener("click",()=>{ $("toneInput").value=btn.dataset.tone; });
+document.querySelectorAll("[data-tone]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    $("toneInput").value = btn.dataset.tone;
+  });
 });
-$("toneSend").addEventListener("click",()=>{
-  const tone=$("toneInput").value.trim();
-  if(tone) $("assistantPrompt").textContent=`Thanks. I’ll use ${tone} as your selected skin tone for recommendations.`;
-});
-$("voiceBtn").addEventListener("click",()=>alert("Voice UI is ready. Connect your preferred speech service or browser speech API."));
-$("micBtn").addEventListener("click",()=>alert("Voice input placeholder."));
 
-$("generateDesc").addEventListener("click",()=>{
-  const n=$("productName").value.trim()||"This K-beauty product";
-  const b=$("productBenefit").value.trim()||"support healthier-looking skin";
-  $("descriptionOutput").textContent=`${n} is designed to ${b}. Add it to a simple Korean beauty routine for targeted care with an easy, customer-friendly experience.`;
-});
-$("routineBtn").addEventListener("click",()=>{
-  const t=$("skinType").value,g=$("goal").value,s=$("season").value;
-  $("routineOutput").classList.remove("hidden");
-  $("routineOutput").innerHTML=`<strong>AM:</strong> Gentle cleanser → targeted toner/serum → moisturizer → SPF.<br><br><strong>PM:</strong> Cleanser → treatment for ${escapeHtml(g.toLowerCase())} → moisturizer.<br><br>Built for ${escapeHtml(t.toLowerCase())} skin · ${escapeHtml(s.toLowerCase())}.`;
+$("toneSend")?.addEventListener("click", async () => {
+  const tone = $("toneInput").value.trim();
+  if (!tone) return;
+  $("assistantPrompt").textContent = `Searching matches for ${tone}…`;
+  setStatus(`Searching matches for ${tone}…`);
+  try {
+    const products = await matchProducts({ concerns: [] });
+    renderProducts(products);
+    results.classList.remove("hidden");
+    setStatus(`Matches for ${tone} are ready.`);
+    $("assistantPrompt").textContent = `I found Genze Hub recommendations for ${tone}.`;
+  } catch (err) {
+    console.error(err);
+    setStatus("Products could not be loaded. Check the Shopify connection.");
+  }
 });
 
 window.addEventListener("beforeunload", closeCamera);

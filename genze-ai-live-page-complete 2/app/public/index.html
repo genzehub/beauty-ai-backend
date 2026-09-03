@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f3f0e7">
+  <title>Genze AI</title>
+  <meta name="description" content="Genze AI beauty assistant for personalized K-beauty recommendations.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="page-shell">
+  <header class="site-header">
+    <a class="brand" href="https://genzehub.co.in" target="_blank" rel="noopener noreferrer"><span class="brand-mark">G</span><span>GENZE AI</span></a>
+    <span class="live-pill"><span class="live-dot"></span>Live assistant</span>
+  </header>
+
+  <section class="hero-section">
+    <p class="hero-eyebrow">POWERED FOR GENZE HUB</p>
+    <h1>Your Korean beauty guide,<br>ready to help.</h1>
+    <p class="hero-copy">Personal recommendations, easy routines, and clearer product choices—any time your customer needs them.</p>
+  </section>
+
+
+    <section class="top-grid">
+      <article class="panel voice-panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="sans-title">Voice Beauty Consultant</h2>
+            <p>Step 1 · Tell me your skin tone</p>
+          </div>
+          <button class="ghost-pill" id="voiceBtn" type="button">Enable voice</button>
+        </div>
+
+        <div class="voice-body">
+          <div class="assistant-message">
+            <span class="avatar">G</span>
+            <div class="bubble" id="assistantPrompt">
+              Welcome to Genze Hub. First, what is your skin tone: fair, light, medium, tan, or deep?
+            </div>
+          </div>
+
+          <div class="voice-bottom">
+            <div class="tone-row">
+              <button type="button" data-tone="Fair">Fair</button>
+              <button type="button" data-tone="Light">Light</button>
+              <button type="button" data-tone="Medium">Medium</button>
+              <button type="button" data-tone="Tan">Tan</button>
+              <button type="button" data-tone="Deep">Deep</button>
+            </div>
+
+            <div class="chat-input">
+              <button class="mic-btn" id="micBtn" type="button" aria-label="Voice input">🎙</button>
+              <input id="toneInput" type="text" placeholder="Say or type your skin tone...">
+              <button class="send-btn" id="toneSend" type="button" aria-label="Send">↑</button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel description-panel">
+        <div class="studio-head">
+          <span class="studio-icon">✦</span>
+          <div>
+            <h2 class="sans-title">Description Studio</h2>
+            <p>Create sales-focused product copy</p>
+          </div>
+        </div>
+
+        <div class="thin-rule"></div>
+
+        <label class="field-label" for="productName">Product name</label>
+        <input class="field" id="productName" placeholder="e.g. Heartleaf Toner">
+
+        <label class="field-label" for="productBenefit">Main benefit</label>
+        <input class="field" id="productBenefit" placeholder="e.g. calm sensitive skin">
+
+        <button class="dark-action" id="generateDesc" type="button">Generate description <span>✦</span></button>
+
+        <div class="description-output" id="descriptionOutput">
+          <span class="output-star">✦</span>
+          <span>Your optimized product description will appear here.</span>
+        </div>
+      </article>
+    </section>
+
+    <section class="tools-heading">
+      <div>
+        <p class="eyebrow">GENZE AI TOOLS</p>
+        <h1>Personal beauty, made clear.</h1>
+      </div>
+      <p class="catalog-note">Real AI skin analysis connected to all 5,006 Genze Hub products.</p>
+    </section>
+
+    <section class="bottom-grid">
+      <article class="panel tool-panel camera-panel">
+        <div class="tool-badge">◎</div>
+        <h2 class="sans-title tool-title">Find My Matching Products</h2>
+        <p class="tool-copy">Take one clear, front-facing photo. Keep your forehead, chin, and both cheeks visible, look straight ahead, and remove glasses.</p>
+
+        <label class="consent-row">
+          <input id="consentCheckbox" type="checkbox">
+          <span>I consent to securely send this photo to YouCam for AI skin analysis.</span>
+        </label>
+
+        <div class="camera-actions">
+          <button class="green-action" id="startCameraBtn" type="button">Open Phone Camera</button>
+          <label class="upload-action">
+            Upload Photo
+            <input id="photoInput" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+          </label>
+        </div>
+
+        <div class="camera-shell hidden" id="cameraShell">
+          <video id="cameraFeed" autoplay playsinline muted></video>
+          <div class="face-guide" aria-hidden="true">
+            <div class="face-oval"></div>
+            <span>Center your full face inside the guide</span>
+          </div>
+          <button class="capture-btn" id="capturePhotoBtn" type="button" aria-label="Capture photo"></button>
+          <button class="close-camera" id="closeCameraBtn" type="button" aria-label="Close camera">×</button>
+        </div>
+
+        <canvas id="overlayCanvas" class="hidden"></canvas>
+        <div class="analysis-status hidden" id="statusMessage" role="status"></div>
+        <div class="results hidden" id="resultsContainer"></div>
+
+        <p class="legal">Product matching uses appearance analysis and is not a medical diagnosis. Results may vary with lighting and camera quality. YouCam retains processed results for up to 24 hours.</p>
+      </article>
+
+      <article class="panel tool-panel routine-panel">
+        <div class="tool-badge sun">☀</div>
+        <h2 class="sans-title tool-title">AM/PM Routine Builder</h2>
+
+        <div class="routine-fields">
+          <label>Skin type
+            <select id="skinType">
+              <option>Combination</option><option>Normal</option><option>Dry</option><option>Oily</option><option>Sensitive</option>
+            </select>
+          </label>
+          <label>Goal
+            <select id="goal">
+              <option>Hydration</option><option>Brightening</option><option>Texture</option><option>Pores</option><option>Acne care</option><option>Anti-aging</option>
+            </select>
+          </label>
+          <label>Season
+            <select id="season">
+              <option>Everyday</option><option>Summer</option><option>Winter</option><option>Monsoon</option>
+            </select>
+          </label>
+        </div>
+
+        <button class="green-action full" id="routineBtn" type="button">Build my routine</button>
+        <div class="routine-output hidden" id="routineOutput"></div>
+      </article>
+    </section>
+
+    <footer>
+      <span>GENZE HUB · AUTHENTIC K-BEAUTY</span>
+      <a href="https://genzehub.co.in" target="_blank" rel="noopener noreferrer">Visit store ↗</a>
+    </footer>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+GENZE AI — SCREENSHOT-MATCHED COMPLETE PROJECT
+
+1. Open the app folder.
+2. Copy .env.example to .env.
+3. Put a NEW/ROTATED YouCam API key in .env:
+   YOUCAM_API_KEY=YOUR_NEW_KEY
+4. In Terminal, inside app:
+   npm install
+   npm start
+5. Open http://localhost:3000
+
+The UI is rebuilt to match the provided Genze AI page screenshot:
+- Voice Beauty Consultant (top left)
+- Description Studio (top right)
+- "Personal beauty, made clear."
+- Find My Matching Products (bottom left)
+- AM/PM Routine Builder (bottom right)
+- cream background + green/white styling
+
+The YouCam key is intentionally NOT included in this ZIP.

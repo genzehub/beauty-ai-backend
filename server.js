@@ -532,7 +532,7 @@ async function fetchShopifyProducts() {
   const query = `
     query GenzeProducts {
       products(
-        first: 100,
+        first: 20,
         sortKey: BEST_SELLING
       ) {
         edges {

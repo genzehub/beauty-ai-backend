@@ -644,7 +644,50 @@ if (
     ? 20
     : 0;
 }
+/* OILY HAIR */
 
+if (
+  category === "haircare" &&
+  key === "oily"
+) {
+  if (
+    [
+      "foot",
+      "feet",
+      "heel",
+      "hair loss",
+      "thickening"
+    ].some(has)
+  ) {
+    return 0;
+  }
+
+  if (
+    [
+      "oily scalp",
+      "oily hair",
+      "excess sebum",
+      "sebum control"
+    ].some(has)
+  ) {
+    return 20;
+  }
+
+  const scalpShampoo =
+    (
+      hasStrong("scalp care") ||
+      hasStrong("scalp")
+    ) &&
+    hasStrong("shampoo");
+
+  if (scalpShampoo) {
+    return 10;
+  }
+
+  return 0;
+}
+
+/* FRAGRANCE FALSE MATCH FIX */
   /* FRAGRANCE FALSE MATCH FIX */
 
   if (category === "fragrance") {

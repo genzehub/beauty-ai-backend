@@ -1139,8 +1139,12 @@ async function pollSkinTask(
       ].includes(state)
     ) {
       throw new Error(
-        "YouCam analysis failed"
-      );
+  result?.error ||
+  result?.message ||
+  result?.data?.error ||
+  result?.data?.message ||
+  JSON.stringify(result)
+);
     }
 
     await sleep(1500);

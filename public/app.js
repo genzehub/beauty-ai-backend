@@ -803,6 +803,72 @@ async function initMediaPipe() {
 
     mediaPipeReady = false;
   }
+}async function checkFaceQuality(imageSource) {
+  if (!mediaPipeReady || !faceLandmarker) {
+    return {
+      ok: false,
+      reason: "Face scanner is still loading."
+    };
+  }
+
+  const result =
+    faceLandmarker.detect(imageSource);
+
+  const landmarks =
+    result?.faceLandmarks?.[0];
+
+  if (!landmarks) {
+    return {
+      ok: false,
+      reason: "No face detected. Keep your full face inside the oval."
+    };
+  }
+
+  const xs =
+    landmarks.map(point => point.x);
+
+  const ys =
+    landmarks.map(point => point.y);
+
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+
+  const faceWidth = maxX - minX;
+  const faceHeight = maxY - minY;
+
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+
+  if (faceWidth < 0.22 || faceHeight < 0.28) {
+    return {
+      ok: false,
+      reason: "Move closer to the camera."
+    };
+  }
+
+  if (faceWidth > 0.75 || faceHeight > 0.82) {
+    return {
+      ok: false,
+      reason: "Move slightly away from the camera."
+    };
+  }
+
+  if (
+    Math.abs(centerX - 0.5) > 0.16 ||
+    Math.abs(centerY - 0.5) > 0.18
+  ) {
+    return {
+      ok: false,
+      reason: "Center your face inside the oval."
+    };
+  }
+
+  return {
+    ok: true,
+    reason: "Face quality passed."
+  };
 }
 let stream = null;
 

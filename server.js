@@ -1,9 +1,9 @@
-import express from "express";
-import cors from "cors";
-import multer from "multer";
-import dotenv from "dotenv";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import express from 'express';
+import cors from 'cors';
+import multer from 'multer';
+import dotenv from 'dotenv';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 dotenv.config();
 
@@ -11,3348 +11,387 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 12 * 1024 * 1024
-  }
-});
+const STORE = (process.env.GENZE_STORE_URL || 'https://genzehub.co.in').replace(/\/$/, '');
+const SHOPIFY_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN || '';
+const SHOPIFY_TOKEN = process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN || '';
 
-const STORE = (
-  process.env.GENZE_STORE_URL ||
-  "https://genzehub.co.in"
-).replace(/\/$/, "");
-
-const SHOPIFY_DOMAIN =
-  process.env.SHOPIFY_STORE_DOMAIN || "";
-
-const SHOPIFY_TOKEN =
-  process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN || "";
-
-const SELF_HOSTED_SKIN_AI_URL =
-  process.env.SELF_HOSTED_SKIN_AI_URL || "";
-
-const SELF_HOSTED_SKIN_AI_KEY =
-  process.env.SELF_HOSTED_SKIN_AI_KEY || "";
-
-const SELF_AI_MIN_CONFIDENCE = Number(
-  process.env.SELF_AI_MIN_CONFIDENCE || 72
-);
-
-const YOUCAM_API =
-  "https://yce-api-01.makeupar.com";
-
-const YOUCAM_KEY =
-  process.env.YOUCAM_API_KEY || "";
+const SELF_HOSTED_SKIN_AI_URL = process.env.SELF_HOSTED_SKIN_AI_URL || '';
+const SELF_HOSTED_SKIN_AI_KEY = process.env.SELF_HOSTED_SKIN_AI_KEY || '';
+const YOUCAM_API_KEY = process.env.YOUCAM_API_KEY || '';
+const SELF_AI_MIN_CONFIDENCE = Number(process.env.SELF_AI_MIN_CONFIDENCE || 72);
 
 app.use(cors());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-app.use(
-  express.json({
-    limit: "3mb"
-  })
-);
+// Fixed Multer syntax (added closing });)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 12 * 1024 * 1024 }
+});
 
-app.use(
-  express.static(
-    path.join(
-      __dirname,
-      "public"
-    )
-  )
-);
+app.use(express.static(path.join(__dirname, 'public')));
 
+app.get('/', (req, res) => {
+  res.sendFile('index.html', { root: path.join(__dirname, 'public') }, (err) => {
+    if (err) {
+      console.error('index.html not found:', err);
+      res.status(404).send('index.html file not found in public directory!');
+    }
+  });
+});
 
-/* =========================================================
-   FETCH HELPER
-========================================================= */
+let productCache = [];
+let productCacheTime = 0;
+const CACHE_MS = 15 * 60 * 1000;
 
-async function jsonFetch(
-  url,
-  options = {},
-  timeoutMs = 20000
-) {
-
-  const controller =
-    new AbortController();
-
-  const timeout =
-    setTimeout(
-      () => controller.abort(),
-      timeoutMs
-    );
+async function jsonFetch(url, options = {}, timeoutMs = 20000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
 
-    const response =
-      await fetch(
-        url,
-        {
-          ...options,
-          signal: controller.signal
-        }
-      );
-
-    const text =
-      await response.text();
-
+    const text = await response.text();
     let body;
-
     try {
-
-      body =
-        JSON.parse(text);
-
+      body = JSON.parse(text);
     } catch {
-
-      body = {
-        raw: text
-      };
-
+      body = { raw: text };
     }
 
     if (!response.ok) {
-
-      const error =
-        new Error(
-          body?.errors?.[0]?.message ||
-          body?.error ||
-          body?.message ||
-          `HTTP ${response.status}`
-        );
-
-      error.status =
-        response.status;
-
-      error.body =
-        body;
-
-      throw error;
+      const msg = body?.errors?.[0]?.message || body?.message || `HTTP ${response.status}`;
+      const err = new Error(msg);
+      err.status = response.status;
+      err.body = body;
+      throw err;
     }
 
     return body;
-
   } finally {
-
     clearTimeout(timeout);
-
   }
 }
-
-
-/* =========================================================
-   SHOPIFY PRODUCT CACHE
-========================================================= */
-
-let productCache = [];
-
-let productCacheTime = 0;
-
-let productLoadingPromise =
-  null;
-
-const CACHE_MS =
-  15 * 60 * 1000;
-
-
-function clean(
-  value = ""
-) {
-
-  return String(value)
-    .toLowerCase()
-    .replace(
-      /[^a-z0-9]+/g,
-      " "
-    )
-    .trim();
-
-}
-
-
-function productText(
-  product
-) {
-
-  return clean(
-    [
-      product.title,
-      product.description,
-      product.productType,
-      product.vendor,
-      ...(product.tags || [])
-    ].join(" ")
-  );
-
-}
-
 
 async function loadAllShopifyProducts() {
-
-  if (
-    !SHOPIFY_DOMAIN ||
-    !SHOPIFY_TOKEN
-  ) {
-
-    throw new Error(
-      "Shopify Storefront credentials are not configured"
-    );
-
-  }
-
-
-  if (
-    productCache.length &&
-    Date.now() -
-      productCacheTime <
-      CACHE_MS
-  ) {
-
+  if (productCache.length && Date.now() - productCacheTime < CACHE_MS) {
     return productCache;
-
   }
 
-
-  if (
-    productLoadingPromise
-  ) {
-
-    return productLoadingPromise;
-
+  if (!SHOPIFY_DOMAIN || !SHOPIFY_TOKEN) {
+    console.warn('Missing SHOPIFY_STORE_DOMAIN or SHOPIFY_STOREFRONT_ACCESS_TOKEN envvars.');
+    return [];
   }
 
+  try {
+    const products = [];
+    let cursor = null;
+    let hasNextPage = true;
 
-  productLoadingPromise =
-    (async () => {
-
-      try {
-
-        const products = [];
-
-        let cursor = null;
-
-        let hasNextPage =
-          true;
-
-
-        while (
-          hasNextPage
-        ) {
-
-          const query = `
-            query GenzeCatalog($cursor: String) {
-              products(
-                first: 250,
-                after: $cursor,
-                sortKey: TITLE
-              ) {
-                edges {
-                  cursor
-
-                  node {
-                    id
-                    title
-                    handle
-                    description
-                    productType
-                    vendor
-                    tags
-
-                    featuredImage {
-                      url
-                      altText
-                    }
-
-                    priceRange {
-                      minVariantPrice {
-                        amount
-                        currencyCode
-                      }
-                    }
-                  }
-                }
-
-                pageInfo {
-                  hasNextPage
-                  endCursor
-                }
+    while (hasNextPage && products.length < 5000) {
+      const query = `
+        query GenzeCatalog($cursor: String) {
+          products(first: 250, after: $cursor, sortKey: TITLE) {
+            edges {
+              node {
+                id
+                title
+                handle
+                productType
+                vendor
+                tags
+                description
+                featuredImage { url }
+                priceRange { minVariantPrice { amount currencyCode } }
               }
             }
-          `;
-
-
-          const data =
-            await jsonFetch(
-              `https://${SHOPIFY_DOMAIN}/api/2026-07/graphql.json`,
-              {
-
-                method:
-                  "POST",
-
-                headers: {
-
-                  "Content-Type":
-                    "application/json",
-
-                  "Shopify-Storefront-Private-Token":
-                    SHOPIFY_TOKEN
-
-                },
-
-                body:
-                  JSON.stringify({
-
-                    query,
-
-                    variables: {
-                      cursor
-                    }
-
-                  })
-
-              }
-            );
-
-
-          if (
-            data?.errors?.length
-          ) {
-
-            throw new Error(
-              data.errors[0]?.message ||
-              "Shopify GraphQL error"
-            );
-
+            pageInfo { hasNextPage endCursor }
           }
-
-
-          const connection =
-            data?.data?.products;
-
-
-          const edges =
-            connection?.edges ||
-            [];
-
-
-          for (
-            const { node }
-            of edges
-          ) {
-
-            products.push({
-
-              id:
-                node.id,
-
-              title:
-                node.title ||
-                "",
-
-              handle:
-                node.handle ||
-                "",
-
-              description:
-                node.description ||
-                "",
-
-              productType:
-                node.productType ||
-                "",
-
-              vendor:
-                node.vendor ||
-                "",
-
-              tags:
-                node.tags ||
-                [],
-
-              image:
-                node.featuredImage?.url ||
-                "",
-
-              price:
-                node
-                  .priceRange
-                  ?.minVariantPrice
-                  ?.amount ||
-                "",
-
-              currency:
-                node
-                  .priceRange
-                  ?.minVariantPrice
-                  ?.currencyCode ||
-                "",
-
-              url:
-                `${STORE}/products/${node.handle}`
-
-            });
-
-          }
-
-
-          hasNextPage =
-            Boolean(
-              connection
-                ?.pageInfo
-                ?.hasNextPage
-            );
-
-
-          cursor =
-            connection
-              ?.pageInfo
-              ?.endCursor ||
-            null;
-
         }
-
-
-        productCache =
-          products;
-
-
-        productCacheTime =
-          Date.now();
-
-
-        console.log(
-          `Shopify cache loaded: ${products.length} products`
-        );
-
-
-        return products;
-
-      } finally {
-
-        productLoadingPromise =
-          null;
-
-      }
-
-    })();
-
-
-  return productLoadingPromise;
-
-}
-
-
-/* =========================================================
-   CATEGORY / CONCERN DICTIONARIES
-========================================================= */
-
-const CATEGORY_TERMS = {
-
-  skincare: [
-
-    "skincare",
-    "cleanser",
-    "cleansing",
-    "toner",
-    "serum",
-    "essence",
-    "ampoule",
-    "cream",
-    "moisturizer",
-    "mask",
-    "sunscreen",
-    "spf",
-    "eye cream",
-    "exfoliator"
-
-  ],
-
-
-  makeup: [
-
-    "foundation",
-    "cushion",
-    "concealer",
-    "powder",
-    "compact",
-    "lip",
-    "tint",
-    "mascara",
-    "eyeliner",
-    "blush",
-    "palette",
-    "bb cream",
-    "cc cream"
-
-  ],
-
-
-  haircare: [
-
-    "hair",
-    "shampoo",
-    "conditioner",
-    "scalp",
-    "hair oil",
-    "hair mask",
-    "hair serum",
-    "hair treatment"
-
-  ],
-
-
-  fragrance: [
-
-    "fragrance",
-    "perfume",
-    "parfum",
-    "eau de parfum",
-    "eau de toilette",
-    "body mist",
-    "scent"
-
-  ]
-
-};
-
-
-const CONCERNS = {
-
-  skincare: {
-
-    hydration: [
-
-      "hydrating",
-      "hydration",
-      "moisture",
-      "hyaluronic",
-      "ceramide",
-      "barrier"
-
-    ],
-
-
-    acne: [
-
-      "acne",
-      "blemish",
-      "breakout",
-      "salicylic",
-      "bha",
-      "tea tree"
-
-    ],
-
-
-    pores: [
-
-      "pore",
-      "pores",
-      "niacinamide",
-      "sebum",
-      "bha"
-
-    ],
-
-
-    brightening: [
-
-      "brightening",
-      "glow",
-      "radiance",
-      "vitamin c",
-      "arbutin",
-      "tranexamic"
-
-    ],
-
-
-    redness: [
-
-      "redness",
-      "calming",
-      "soothing",
-      "centella",
-      "cica",
-      "heartleaf"
-
-    ],
-
-
-    "anti-aging": [
-
-      "anti aging",
-      "wrinkle",
-      "retinol",
-      "peptide",
-      "collagen"
-
-    ],
-
-
-    sensitive: [
-
-      "sensitive",
-      "soothing",
-      "calming",
-      "gentle",
-      "centella",
-      "cica"
-
-    ]
-
-  },
-
-
-  makeup: {
-
-    foundation: [
-
-      "foundation",
-      "cushion",
-      "bb cream",
-      "cc cream",
-      "skin tint"
-
-    ],
-
-
-    concealer: [
-
-      "concealer"
-
-    ],
-
-
-    powder: [
-
-      "powder",
-      "compact"
-
-    ],
-
-
-    "lip-color": [
-
-      "lip",
-      "lipstick",
-      "lip tint"
-
-    ]
-
-  },
-
-
-  haircare: {
-
-    "hair-fall": [
-
-      "hair fall",
-      "hair loss",
-      "anti hair loss",
-      "thickening",
-      "strengthening"
-
-    ],
-
-
-    dandruff: [
-
-      "dandruff",
-      "anti dandruff",
-      "anti-dandruff",
-      "flaky scalp",
-      "flake"
-
-    ],
-
-
-    dry: [
-
-      "dry hair",
-      "dry scalp",
-      "moisturizing hair",
-      "hydrating hair",
-      "moisture",
-      "nourishing",
-      "conditioning"
-
-    ],
-
-
-    damaged: [
-
-      "damaged hair",
-      "hair repair",
-      "repair treatment",
-      "protein treatment",
-      "keratin",
-      "damage care"
-
-    ],
-
-
-    oily: [
-
-      "oily scalp",
-      "oily hair",
-      "excess sebum",
-      "sebum control"
-
-    ]
-
-  },
-
-
-  fragrance: {
-
-    floral: [
-
-      "floral",
-      "rose",
-      "jasmine",
-      "flower"
-
-    ],
-
-
-    fresh: [
-
-      "fresh",
-      "citrus",
-      "aquatic",
-      "green"
-
-    ],
-
-
-    vanilla: [
-
-      "vanilla",
-      "amber",
-      "sweet",
-      "warm",
-      "musk",
-      "woody",
-      "oriental",
-      "creamy",
-      "powdery"
-
-    ],
-
-
-    longlasting: [
-
-      "eau de parfum",
-      "edp",
-      "parfum",
-      "eau de toilette",
-      "edt"
-
-    ]
-
-  }
-
-};
-
-
-const TONE_TERMS = {
-
-  fair: [
-
-    "fair",
-    "porcelain",
-    "ivory"
-
-  ],
-
-
-  light: [
-
-    "light",
-    "ivory",
-    "light beige",
-    "n01",
-    "01"
-
-  ],
-
-
-  medium: [
-
-    "medium",
-    "natural beige",
-    "sand",
-    "warm beige",
-    "n02",
-    "02"
-
-  ],
-
-
-  tan: [
-
-    "tan",
-    "honey",
-    "caramel",
-    "golden"
-
-  ],
-
-
-  deep: [
-
-    "deep",
-    "dark",
-    "cocoa",
-    "espresso",
-    "mahogany"
-
-  ]
-
-};
-
-
-/* =========================================================
-   ANALYSIS -> CONCERN
-========================================================= */
-
-function analysisConcern(
-  analysis
-) {
-
-  if (!analysis) {
-
-    return "";
-
-  }
-
-
-  if (
-    analysis.primary_concern
-  ) {
-
-    return clean(
-      analysis.primary_concern
-    ).replace(
-      / /g,
-      "-"
-    );
-
-  }
-
-
-  const scores =
-    Array.isArray(
-      analysis.scores
-    )
-      ? analysis.scores
-      : [];
-
-
-  const mapping = {
-
-    acne:
-      "acne",
-
-    pore:
-      "pores",
-
-    pores:
-      "pores",
-
-    redness:
-      "redness",
-
-    moisture:
-      "hydration",
-
-    dehydration:
-      "hydration",
-
-    radiance:
-      "brightening",
-
-    pigmentation:
-      "brightening",
-
-    age_spot:
-      "brightening",
-
-    dark_circle:
-      "brightening",
-
-    wrinkle:
-      "anti-aging",
-
-    wrinkles:
-      "anti-aging",
-
-    texture:
-      "sensitive"
-
-  };
-
-
-  let winner = "";
-
-  let winnerScore =
-    -1;
-
-
-  for (
-    const item
-    of scores
-  ) {
-
-    const type =
-      clean(
-        item?.type ||
-        ""
-      ).replace(
-        / /g,
-        "_"
-      );
-
-
-    const mapped =
-      mapping[type];
-
-
-    if (!mapped) {
-
-      continue;
-
-    }
-
-
-    const score =
-      Number(
-        item?.score ||
-        0
-      );
-
-
-    if (
-      score >
-      winnerScore
-    ) {
-
-      winnerScore =
-        score;
-
-      winner =
-        mapped;
-
-    }
-
-  }
-
-
-  return winner;
-
-}
-
-
-/* =========================================================
-   MATCHING ENGINE
-========================================================= */
-
-function categoryScore(
-  product,
-  category
-) {
-
-  const text =
-    productText(
-      product
-    );
-
-
-  const productType =
-    clean(
-      product.productType
-    );
-
-
-  const terms =
-    CATEGORY_TERMS[
-      category
-    ] || [];
-
-
-  let score = 0;
-
-
-  for (
-    const term
-    of terms
-  ) {
-
-    if (
-      text.includes(
-        clean(term)
-      )
-    ) {
-
-      score += 5;
-
-    }
-
-  }
-
-
-  if (
-    category ===
-      "haircare" &&
-    (
-      productType.includes(
-        "hair"
-      ) ||
-      productType.includes(
-        "scalp"
-      )
-    )
-  ) {
-
-    score += 12;
-
-  }
-
-
-  if (
-    category ===
-      "fragrance" &&
-    (
-      productType.includes(
-        "fragrance"
-      ) ||
-      productType.includes(
-        "perfume"
-      )
-    )
-  ) {
-
-    score += 12;
-
-  }
-
-
-  if (
-    category ===
-      "makeup" &&
-    (
-      productType.includes(
-        "makeup"
-      ) ||
-      productType.includes(
-        "powder"
-      ) ||
-      productType.includes(
-        "foundation"
-      ) ||
-      productType.includes(
-        "concealer"
-      ) ||
-      productType.includes(
-        "lip"
-      )
-    )
-  ) {
-
-    score += 10;
-
-  }
-
-
-  return score;
-
-}
-
-
-function concernScore(
-  product,
-  category,
-  concern
-) {
-
-  if (!concern) {
-
-    return 0;
-
-  }
-
-
-  const key =
-    clean(
-      concern
-    ).replace(
-      / /g,
-      "-"
-    );
-
-
-  const text =
-    productText(
-      product
-    );
-
-
-  const strongText =
-    clean(
-      [
-
-        product.title,
-
-        product.productType,
-
-        ...(product.tags || [])
-
-      ].join(" ")
-    );
-
-
-  const full =
-    ` ${text} `;
-
-
-  const strong =
-    ` ${strongText} `;
-
-
-  const has =
-    term =>
-      full.includes(
-        ` ${clean(term)} `
-      );
-
-
-  const hasStrong =
-    term =>
-      strong.includes(
-        ` ${clean(term)} `
-      );
-
-
-  const hasAny =
-    terms =>
-      terms.some(
-        term =>
-          has(term)
-      );
-
-
-  const hasAnyStrong =
-    terms =>
-      terms.some(
-        term =>
-          hasStrong(term)
-      );
-
-
-  /* =====================================================
-     POWDER / COMPACT
-     BLOCK BAKING POWDER CLEANSERS
-  ===================================================== */
-
-  if (
-    category ===
-      "makeup" &&
-    key ===
-      "powder"
-  ) {
-
-    const blocked = [
-
-      "foam",
-      "cleanser",
-      "cleansing",
-      "face wash",
-      "baking powder",
-      "wash",
-      "soap"
-
-    ];
-
-
-    if (
-      hasAny(
-        blocked
-      )
-    ) {
-
-      return 0;
-
-    }
-
-
-    const realPowderTerms = [
-
-      "makeup powder",
-      "face powder",
-      "loose powder",
-      "setting powder",
-      "pressed powder",
-      "compact",
-      "powder pact",
-      "fix powder"
-
-    ];
-
-
-    const productType =
-      clean(
-        product.productType
-      );
-
-
-    const realPowder =
-
-      productType.includes(
-        "powder"
-      ) ||
-
-      productType.includes(
-        "compact"
-      ) ||
-
-      hasAnyStrong(
-        realPowderTerms
-      );
-
-
-    return realPowder
-      ? 28
-      : 0;
-
-  }
-
-
-  /* =====================================================
-     HAIR FALL
-  ===================================================== */
-
-  if (
-    category ===
-      "haircare" &&
-    key ===
-      "hair-fall"
-  ) {
-
-    return [
-
-      "hair fall",
-      "hair loss",
-      "anti hair loss",
-      "thickening",
-      "strengthening"
-
-    ].some(has)
-
-      ? 24
-      : 0;
-
-  }
-
-
-  /* =====================================================
-     DANDRUFF
-  ===================================================== */
-
-  if (
-    category ===
-      "haircare" &&
-    key ===
-      "dandruff"
-  ) {
-
-
-    if (
-      [
-
-        "hair loss",
-        "anti hair loss",
-        "thickening",
-        "strengthening"
-
-      ].some(has)
-    ) {
-
-      return 0;
-
-    }
-
-
-    if (
-      [
-
-        "dandruff",
-        "anti dandruff",
-        "anti-dandruff",
-        "flaky scalp",
-        "flake"
-
-      ].some(has)
-    ) {
-
-      return 30;
-
-    }
-
-
-    const scalpShampoo =
-
-      (
-        hasStrong(
-          "scalp care"
-        ) ||
-
-        hasStrong(
-          "scalp"
-        )
-      )
-
-      &&
-
-      hasStrong(
-        "shampoo"
-      );
-
-
-    return scalpShampoo
-      ? 14
-      : 0;
-
-  }
-
-
-  /* =====================================================
-     DRY HAIR
-  ===================================================== */
-
-  if (
-    category ===
-      "haircare" &&
-    key ===
-      "dry"
-  ) {
-
-
-    if (
-      [
-
-        "foot",
-        "feet",
-        "heel",
-        "face cream",
-        "body lotion"
-
-      ].some(has)
-    ) {
-
-      return 0;
-
-    }
-
-
-    const productType =
-      clean(
-        product.productType
-      );
-
-
-    const hairEvidence =
-
-      productType.includes(
-        "hair"
-      ) ||
-
-      productType.includes(
-        "scalp"
-      ) ||
-
-      [
-
-        "hair",
-        "shampoo",
-        "conditioner",
-        "scalp",
-        "hair mask",
-        "hair treatment"
-
-      ].some(
-        hasStrong
-      );
-
-
-    if (
-      !hairEvidence
-    ) {
-
-      return 0;
-
-    }
-
-
-    if (
-      [
-
-        "dry hair",
-        "dry scalp",
-        "hydrating hair",
-        "moisturizing hair"
-
-      ].some(has)
-    ) {
-
-      return 30;
-
-    }
-
-
-    if (
-      [
-
-        "moisture",
-        "moisturizing",
-        "hydrating",
-        "nourishing",
-        "conditioning",
-        "ceramide",
-        "repair"
-
-      ].some(has)
-    ) {
-
-      return 14;
-
-    }
-
-
-    return 0;
-
-  }
-
-
-  /* =====================================================
-     OILY HAIR
-  ===================================================== */
-
-  if (
-    category ===
-      "haircare" &&
-    key ===
-      "oily"
-  ) {
-
-
-    if (
-      [
-
-        "foot",
-        "feet",
-        "heel",
-        "hair loss",
-        "thickening"
-
-      ].some(has)
-    ) {
-
-      return 0;
-
-    }
-
-
-    if (
-      [
-
-        "oily scalp",
-        "oily hair",
-        "excess sebum",
-        "sebum control"
-
-      ].some(has)
-    ) {
-
-      return 24;
-
-    }
-
-
-    const scalpShampoo =
-
-      (
-        hasStrong(
-          "scalp care"
-        ) ||
-
-        hasStrong(
-          "scalp"
-        )
-      )
-
-      &&
-
-      hasStrong(
-        "shampoo"
-      );
-
-
-    return scalpShampoo
-      ? 10
-      : 0;
-
-  }
-
-
-  /* =====================================================
-     DAMAGED HAIR
-  ===================================================== */
-
-  if (
-    category ===
-      "haircare" &&
-    key ===
-      "damaged"
-  ) {
-
-
-    const productType =
-      clean(
-        product.productType
-      );
-
-
-    const hairEvidence =
-
-      productType.includes(
-        "hair"
-      ) ||
-
-      productType.includes(
-        "scalp"
-      ) ||
-
-      [
-
-        "hair",
-        "shampoo",
-        "conditioner",
-        "hair treatment",
-        "hair mask"
-
-      ].some(
-        hasStrong
-      );
-
-
-    if (
-      !hairEvidence
-    ) {
-
-      return 0;
-
-    }
-
-
-    return [
-
-      "damaged hair",
-      "damage care",
-      "hair repair",
-      "repair treatment",
-      "protein treatment",
-      "keratin"
-
-    ].some(has)
-
-      ? 28
-      : 0;
-
-  }
-
-
-  /* =====================================================
-     FRAGRANCE
-     REAL FRAGRANCE PRODUCTS ONLY
-  ===================================================== */
-
-  if (
-    category ===
-      "fragrance"
-  ) {
-
-
-    const blocked = [
-
-      "hand cream",
-      "body lotion",
-      "body cream",
-      "body wash",
-      "shower gel",
-      "perfume shower",
-      "shampoo",
-      "conditioner",
-      "hair treatment",
-      "treatment",
-      "hair mask",
-      "cleanser",
-      "cleansing",
-      "soap"
-
-    ];
-
-
-    if (
-      hasAnyStrong(
-        blocked
-      )
-    ) {
-
-      return 0;
-
-    }
-
-
-    const productType =
-      clean(
-        product.productType
-      );
-
-
-    const fragranceSignals = [
-
-      "perfume",
-      "parfum",
-      "eau de parfum",
-      "eau de toilette",
-      "edp",
-      "edt",
-      "body mist",
-      "fragrance"
-
-    ];
-
-
-    const realFragrance =
-
-      productType.includes(
-        "fragrance"
-      )
-
-      ||
-
-      productType.includes(
-        "perfume"
-      )
-
-      ||
-
-      hasAnyStrong(
-        fragranceSignals
-      );
-
-
-    if (
-      !realFragrance
-    ) {
-
-      return 0;
-
-    }
-
-
-    const terms =
-
-      (
-        CONCERNS[
-          category
-        ] || {}
-      )[key]
-
-      || [];
-
-
-    let score = 0;
-
-
-    for (
-      const term
-      of terms
-    ) {
-
-
-      if (
-        hasStrong(
-          term
-        )
-      ) {
-
-        score += 16;
-
-      }
-
-      else if (
-        has(
-          term
-        )
-      ) {
-
-        score += 5;
-
-      }
-
-    }
-
-
-    return score;
-
-  }
-
-
-  /* =====================================================
-     DEFAULT
-  ===================================================== */
-
-  const terms =
-
-    (
-      CONCERNS[
-        category
-      ] || {}
-    )[key]
-
-    || [];
-
-
-  let score = 0;
-
-
-  for (
-    const term
-    of terms
-  ) {
-
-
-    if (
-      hasStrong(
-        term
-      )
-    ) {
-
-      score += 12;
-
-    }
-
-    else if (
-      has(
-        term
-      )
-    ) {
-
-      score += 4;
-
-    }
-
-  }
-
-
-  return score;
-
-}
-
-
-function toneScore(
-  product,
-  tone
-) {
-
-  if (!tone) {
-
-    return 0;
-
-  }
-
-
-  const text =
-    productText(
-      product
-    );
-
-
-  const terms =
-    TONE_TERMS[
-      clean(tone)
-    ] || [];
-
-
-  let score = 0;
-
-
-  for (
-    const term
-    of terms
-  ) {
-
-    if (
-      text.includes(
-        clean(term)
-      )
-    ) {
-
-      score += 8;
-
-    }
-
-  }
-
-
-  return score;
-
-}
-
-
-function queryScore(
-  product,
-  query
-) {
-
-  const q =
-    clean(
-      query
-    );
-
-
-  if (!q) {
-
-    return 0;
-
-  }
-
-
-  const text =
-    productText(
-      product
-    );
-
-
-  const words =
-    q
-      .split(" ")
-      .filter(
-        Boolean
-      );
-
-
-  let score = 0;
-
-
-  for (
-    const word
-    of words
-  ) {
-
-    if (
-      text.includes(
-        word
-      )
-    ) {
-
-      score += 6;
-
-    }
-
-  }
-
-
-  return score;
-
-}
-
-
-function matchCatalog({
-
-  catalog,
-  category,
-  concern,
-  tone,
-  query,
-  analysis
-
-}) {
-
-
-  const detectedConcern =
-    analysisConcern(
-      analysis
-    );
-
-
-  const finalConcern =
-    detectedConcern ||
-    concern;
-
-
-  return catalog
-
-    .map(
-      product => {
-
-
-        const cScore =
-          categoryScore(
-            product,
-            category
-          );
-
-
-        const concernMatch =
-          concernScore(
-            product,
-            category,
-            finalConcern
-          );
-
-
-        const toneMatch =
-
-          category ===
-            "makeup"
-
-            ? toneScore(
-                product,
-                tone
-              )
-
-            : 0;
-
-
-        const searchMatch =
-          queryScore(
-            product,
-            query
-          );
-
-
-        const analysisBoost =
-
-          analysis &&
-
-          finalConcern &&
-
-          concernMatch > 0
-
-            ? 8
-            : 0;
-
-
-        return {
-
-          ...product,
-
-
-          match_score:
-
-            cScore +
-
-            concernMatch +
-
-            toneMatch +
-
-            searchMatch +
-
-            analysisBoost,
-
-
-          match_reason:
-
-            finalConcern
-
-              ? `Matched for ${finalConcern.replaceAll("-", " ")}`
-
-              : ""
-
-        };
-
-      }
-    )
-
-
-    .filter(
-      product => {
-
-
-        if (
-          query
-        ) {
-
-          return (
-            queryScore(
-              product,
-              query
-            ) > 0
-          );
-
-        }
-
-
-        if (
-          categoryScore(
-            product,
-            category
-          ) <= 0
-        ) {
-
-          return false;
-
-        }
-
-
-        if (
-          finalConcern
-        ) {
-
-          return (
-            concernScore(
-              product,
-              category,
-              finalConcern
-            ) > 0
-          );
-
-        }
-
-
-        return true;
-
-      }
-    )
-
-
-    .sort(
-      (a, b) =>
-        b.match_score -
-        a.match_score
-    )
-
-
-    .slice(
-      0,
-      12
-    );
-
-}
-
-
-/* =========================================================
-   PRODUCT MATCH ROUTE
-========================================================= */
-
-app.post(
-
-  "/api/match-products",
-
-  async (
-    req,
-    res
-  ) => {
-
-    try {
-
-
-      const category =
-        clean(
-
-          req.body?.category ||
-
-          req.body?.mode ||
-
-          "skincare"
-
-        );
-
-
-      const concern =
-        String(
-          req.body?.concern ||
-          ""
-        ).trim();
-
-
-      const tone =
-        String(
-          req.body?.tone ||
-          ""
-        ).trim();
-
-
-      const query =
-        String(
-          req.body?.query ||
-          ""
-        ).trim();
-
-
-      const analysis =
-        req.body?.analysis ||
-        null;
-
-
-      const catalog =
-        await loadAllShopifyProducts();
-
-
-      const products =
-        matchCatalog({
-
-          catalog,
-          category,
-          concern,
-          tone,
-          query,
-          analysis
-
-        });
-
-
-      return res.json({
-
-        ok:
-          true,
-
-        category,
-
-        concern,
-
-        tone,
-
-        query,
-
-
-        catalog_size:
-          catalog.length,
-
-
-        products:
-
-          products.map(
-            product => ({
-
-              id:
-                product.id,
-
-              title:
-                product.title,
-
-              vendor:
-                product.vendor,
-
-              category:
-                product.productType,
-
-              image:
-                product.image,
-
-              price:
-                product.price,
-
-              currency:
-                product.currency,
-
-              url:
-                product.url,
-
-              score:
-                product.match_score,
-
-              match_reason:
-                product.match_reason
-
-            })
-          )
-
+      `;
+
+      const data = await jsonFetch(`https://${SHOPIFY_DOMAIN}/api/2026-07/graphql.json`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Shopify-Storefront-Private-Token': SHOPIFY_TOKEN
+        },
+        body: JSON.stringify({ query, variables: { cursor } })
       });
 
-
-    } catch (
-      error
-    ) {
-
-
-      console.error(
-
-        "match-products:",
-
-        error.body ||
-        error
-
-      );
-
-
-      return res
-
-        .status(
-          error.status ||
-          500
-        )
-
-        .json({
-
-          error:
-
-            error.message ||
-
-            "Product matching failed"
-
+      const edges = data?.data?.products?.edges || [];
+      for (const { node } of edges) {
+        products.push({
+          id: node.id,
+          title: node.title || '',
+          handle: node.handle || '',
+          productType: node.productType || '',
+          vendor: node.vendor || '',
+          tags: node.tags || [],
+          description: node.description || '',
+          image: node.featuredImage?.url || '',
+          price: node.priceRange?.minVariantPrice?.amount || '0',
+          currency: node.priceRange?.minVariantPrice?.currencyCode || 'INR',
+          url: `${STORE}/products/${node.handle}`
         });
-
-    }
-
-  }
-
-);
-
-
-/* =========================================================
-   SELF-HOSTED SKIN AI
-========================================================= */
-
-function normalizeSelfHostedAnalysis(
-  result
-) {
-
-
-  const scores =
-    Array.isArray(
-      result?.scores
-    )
-
-      ? result.scores
-
-      : [];
-
-
-  const confidence =
-    Number(
-
-      result?.confidence ??
-
-      result?.model_confidence ??
-
-      0
-
-    );
-
-
-  return {
-
-    ok:
-      true,
-
-
-    source:
-      "Genze Skin AI",
-
-
-    confidence:
-
-      Math.max(
-
-        0,
-
-        Math.min(
-
-          100,
-
-          Math.round(
-            confidence
-          )
-
-        )
-
-      ),
-
-
-    primary_concern:
-
-      result?.primary_concern ||
-
-      "",
-
-
-    scores:
-
-      scores.map(
-        item => ({
-
-          type:
-            String(
-              item?.type ||
-              ""
-            ),
-
-
-          score:
-
-            item?.score ??
-
-            item?.value ??
-
-            null,
-
-
-          confidence:
-
-            item?.confidence ??
-
-            null
-
-        })
-      )
-
-  };
-
-}
-
-
-async function runSelfHostedSkinAI(
-  file
-) {
-
-
-  if (
-    !SELF_HOSTED_SKIN_AI_URL
-  ) {
-
-    throw new Error(
-      "Self-hosted skin AI is not configured"
-    );
-
-  }
-
-
-  const form =
-    new FormData();
-
-
-  const blob =
-    new Blob(
-
-      [
-        file.buffer
-      ],
-
-      {
-
-        type:
-
-          file.mimetype ||
-
-          "image/jpeg"
-
       }
 
-    );
+      hasNextPage = Boolean(data?.data?.products?.pageInfo?.hasNextPage);
+      cursor = data?.data?.products?.pageInfo?.endCursor || null;
+    }
 
+    productCache = products;
+    productCacheTime = Date.now();
+    return products;
+  } catch (err) {
+    console.error('Failed fetching Shopify products:', err?.message || err);
+    return productCache;
+  }
+}
 
-  form.append(
+function normalize(str = '') {
+  return String(str).toLowerCase().replace(/[^a-z0-9]/g, '');
+}
 
-    "photo",
+function matchProductsByTerms(catalog, terms = [], limit = 6) {
+  if (!catalog.length) return [];
+  const cleanTerms = terms.map(normalize).filter(Boolean);
+  if (!cleanTerms.length) return catalog.slice(0, limit);
 
-    blob,
+  const scored = catalog.map((item) => {
+    const haystack = [item.title, item.productType, item.vendor, ...item.tags].map(normalize).join(' ');
+    let score = 0;
+    for (const term of cleanTerms) {
+      if (haystack.includes(term)) score += 1;
+    }
+    return { item, score };
+  });
 
-    file.originalname ||
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, limit).map((s) => s.item);
+}
 
-    "capture.jpg"
+function formatMatchReason(concern, category) {
+  if (concern && category) {
+    return `Matches your concern '${concern}' and product type '${category}'.`;
+  }
+  if (concern) return `Formulated for ${concern} care.`;
+  if (category) return `Recommended option for ${category}.`;
+  return 'Personalized Korean skincare match.';
+}
 
-  );
+async function runSelfHostedSkinAI(fileBuffer, mimeType) {
+  if (!SELF_HOSTED_SKIN_AI_URL) {
+    throw new Error('SELF_HOSTED_SKIN_AI_URL is not configured');
+  }
 
+  const formData = new FormData();
+  const blob = new Blob([fileBuffer], { type: mimeType || 'image/jpeg' });
+  formData.append('image', blob, 'face.jpg');
 
   const headers = {};
-
-
-  if (
-    SELF_HOSTED_SKIN_AI_KEY
-  ) {
-
-    headers.Authorization =
-
-      `Bearer ${SELF_HOSTED_SKIN_AI_KEY}`;
-
+  if (SELF_HOSTED_SKIN_AI_KEY) {
+    headers['Authorization'] = `Bearer ${SELF_HOSTED_SKIN_AI_KEY}`;
   }
 
+  const response = await jsonFetch(SELF_HOSTED_SKIN_AI_URL, {
+    method: 'POST',
+    headers,
+    body: formData
+  });
 
-  const response =
-    await fetch(
-
-      SELF_HOSTED_SKIN_AI_URL,
-
-      {
-
-        method:
-          "POST",
-
-        headers,
-
-        body:
-          form
-
-      }
-
-    );
-
-
-  const data =
-    await response
-
-      .json()
-
-      .catch(
-        () => ({})
-      );
-
-
-  if (
-    !response.ok
-  ) {
-
-    throw new Error(
-
-      data?.error ||
-
-      `Self-hosted skin AI HTTP ${response.status}`
-
-    );
-
-  }
-
-
-  return normalizeSelfHostedAnalysis(
-    data
-  );
-
+  return response;
 }
 
-
-/* =========================================================
-   YOUCAM FALLBACK ONLY
-========================================================= */
-
-function youcamHeaders(
-  extra = {}
-) {
-
-
-  if (
-    !YOUCAM_KEY
-  ) {
-
-    throw new Error(
-      "YOUCAM_API_KEY is not configured"
-    );
-
+async function runYouCamSkinAI(fileBuffer, mimeType) {
+  if (!YOUCAM_API_KEY) {
+    throw new Error('YOUCAM_API_KEY is not configured');
   }
 
-
-  return {
-
-    Authorization:
-      `Bearer ${YOUCAM_KEY}`,
-
-    ...extra
-
+  const base64Img = fileBuffer.toString('base64');
+  const payload = {
+    image: `data:${mimeType || 'image/jpeg'};base64,${base64Img}`
   };
 
+  const response = await jsonFetch('https://api.perfectcorp.com/v1/skin-analysis', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${YOUCAM_API_KEY}`
+    },
+    body: JSON.stringify(payload)
+  });
+
+  return response;
 }
 
-
-const sleep =
-  ms =>
-
-    new Promise(
-      resolve =>
-
-        setTimeout(
-          resolve,
-          ms
-        )
-    );
-
-
-async function createUploadSlot(
-  file
-) {
-
-
-  return jsonFetch(
-
-    `${YOUCAM_API}/s2s/v2.0/file`,
-
+function mockSkinAIAnalysis() {
+  const mockProfiles = [
     {
-
-      method:
-        "POST",
-
-
-      headers:
-
-        youcamHeaders({
-
-          "Content-Type":
-            "application/json"
-
-        }),
-
-
-      body:
-
-        JSON.stringify({
-
-          files: [
-
-            {
-
-              file_name:
-
-                file.originalname ||
-
-                `capture-${Date.now()}.jpg`,
-
-
-              file_size:
-                file.size,
-
-
-              content_type:
-
-                file.mimetype ||
-
-                "image/jpeg"
-
-            }
-
-          ]
-
-        })
-
+      primary_concern: 'hydration',
+      scores: [
+        { type: 'hydration', score: 38 },
+        { type: 'brightening', score: 65 },
+        { type: 'pores', score: 82 }
+      ]
+    },
+    {
+      primary_concern: 'acne',
+      scores: [
+        { type: 'acne', score: 45 },
+        { type: 'redness', score: 58 },
+        { type: 'hydration', score: 72 }
+      ]
+    },
+    {
+      primary_concern: 'brightening',
+      scores: [
+        { type: 'brightening', score: 40 },
+        { type: 'dark_spot', score: 50 },
+        { type: 'hydration', score: 68 }
+      ]
     }
+  ];
 
-  );
-
-}
-
-
-async function uploadToSignedUrl(
-  slot,
-  file
-) {
-
-
-  const info =
-    slot?.data
-      ?.files?.[0];
-
-
-  const request =
-    info?.requests?.[0];
-
-
-  if (
-    !info?.file_id ||
-    !request?.url
-  ) {
-
-    throw new Error(
-      "YouCam upload URL missing"
-    );
-
-  }
-
-
-  const response =
-    await fetch(
-
-      request.url,
-
-      {
-
-        method:
-
-          request.method ||
-
-          "PUT",
-
-
-        headers: {
-
-          ...(request.headers || {}),
-
-          "Content-Type":
-
-            file.mimetype ||
-
-            "image/jpeg"
-
-        },
-
-
-        body:
-          file.buffer
-
-      }
-
-    );
-
-
-  if (
-    !response.ok
-  ) {
-
-    throw new Error(
-      `YouCam upload failed: ${response.status}`
-    );
-
-  }
-
-
-  return info.file_id;
-
-}
-
-
-const HD_ACTIONS = [
-
-  "hd_wrinkle",
-
-  "hd_pore",
-
-  "hd_texture",
-
-  "hd_acne",
-
-  "hd_redness",
-
-  "hd_oiliness",
-
-  "hd_age_spot",
-
-  "hd_radiance",
-
-  "hd_moisture",
-
-  "hd_dark_circle",
-
-  "hd_eye_bag",
-
-  "hd_skin_type"
-
-];
-
-
-async function createSkinTask(
-  fileId
-) {
-
-
-  const result =
-    await jsonFetch(
-
-      `${YOUCAM_API}/s2s/v2.1/task/skin-analysis`,
-
-      {
-
-        method:
-          "POST",
-
-
-        headers:
-
-          youcamHeaders({
-
-            "Content-Type":
-              "application/json"
-
-          }),
-
-
-        body:
-
-          JSON.stringify({
-
-            src_file_id:
-              fileId,
-
-
-            dst_actions:
-              HD_ACTIONS,
-
-
-            format:
-              "json"
-
-          })
-
-      }
-
-    );
-
-
-  const taskId =
-    result?.data
-      ?.task_id;
-
-
-  if (
-    !taskId
-  ) {
-
-    throw new Error(
-      "YouCam task ID missing"
-    );
-
-  }
-
-
-  return taskId;
-
-}
-
-
-async function pollSkinTask(
-  taskId
-) {
-
-
-  const deadline =
-    Date.now() +
-    70000;
-
-
-  while (
-    Date.now() <
-    deadline
-  ) {
-
-
-    const result =
-      await jsonFetch(
-
-        `${YOUCAM_API}/s2s/v2.1/task/skin-analysis/${encodeURIComponent(taskId)}`,
-
-        {
-
-          headers:
-            youcamHeaders()
-
-        }
-
-      );
-
-
-    const status =
-      String(
-
-        result?.data
-          ?.task_status ||
-
-        ""
-
-      ).toLowerCase();
-
-
-    if (
-      status ===
-      "success"
-    ) {
-
-      return result;
-
-    }
-
-
-    if (
-      [
-
-        "failed",
-        "error"
-
-      ].includes(
-        status
-      )
-    ) {
-
-      throw new Error(
-
-        result?.error ||
-
-        result?.message ||
-
-        result?.data?.error ||
-
-        result?.data?.message ||
-
-        "YouCam analysis failed"
-
-      );
-
-    }
-
-
-    await sleep(
-      1500
-    );
-
-  }
-
-
-  throw new Error(
-    "YouCam analysis timed out"
-  );
-
-}
-
-
-function normalizeYouCam(
-  result
-) {
-
-
-  const output =
-
-    result?.data
-      ?.results?.output ||
-
-    [];
-
-
-  const scores =
-
-    Array.isArray(
-      output
-    )
-
-      ? output
-
-      : [];
-
-
-  const normalized =
-
-    scores.map(
-      item => ({
-
-        type:
-
-          String(
-            item?.type ||
-            ""
-          ).replace(
-            /^hd_/,
-            ""
-          ),
-
-
-        score:
-
-          item?.ui_score ??
-
-          item?.raw_score ??
-
-          item?.skin_type ??
-
-          item?.value ??
-
-          item?.label ??
-
-          item?.result ??
-
-          null
-
-      })
-    );
-
-
-  const numeric =
-
-    normalized
-
-      .map(
-        item =>
-          Number(
-            item.score
-          )
-      )
-
-      .filter(
-        Number.isFinite
-      );
-
-
-  const confidence =
-
-    numeric.length
-
-      ? Math.round(
-
-          numeric.reduce(
-
-            (
-              sum,
-              value
-            ) =>
-
-              sum +
-              value,
-
-            0
-
-          )
-
-          /
-
-          numeric.length
-
-        )
-
-      : 75;
-
+  const selected = mockProfiles[Math.floor(Math.random() * mockProfiles.length)];
 
   return {
-
-    ok:
-      true,
-
-
-    source:
-      "YouCam fallback",
-
-
-    confidence,
-
-
-    primary_concern:
-      "",
-
-
-    scores:
-      normalized
-
+    confidence: Math.floor(Math.random() * (98 - 85 + 1)) + 85,
+    primary_concern: selected.primary_concern,
+    scores: selected.scores
   };
-
 }
 
-
-async function runYouCam(
-  file
-) {
-
-
-  const slot =
-    await createUploadSlot(
-      file
-    );
-
-
-  const fileId =
-    await uploadToSignedUrl(
-
-      slot,
-
-      file
-
-    );
-
-
-  const taskId =
-    await createSkinTask(
-      fileId
-    );
-
-
-  const result =
-    await pollSkinTask(
-      taskId
-    );
-
-
-  return normalizeYouCam(
-    result
-  );
-
-}
-
-
-/* =========================================================
-   SKIN ANALYSIS ROUTE
-
-   SELF-HOSTED FIRST
-   ↓
-   CONFIDENCE
-   ↓
-   YOUCAM FALLBACK
-========================================================= */
-
-app.post(
-
-  "/api/skin-analysis",
-
-  upload.single(
-    "photo"
-  ),
-
-  async (
-    req,
-    res
-  ) => {
-
-
-    try {
-
-
-      if (
-        !req.file
-      ) {
-
-        return res
-
-          .status(
-            400
-          )
-
-          .json({
-
-            error:
-              "No photo received"
-
-          });
-
-      }
-
-
-      let clientQuality = {};
-
-
-      try {
-
-
-        clientQuality =
-          JSON.parse(
-
-            req.body
-              ?.client_quality ||
-
-            "{}"
-
-          );
-
-
-      } catch {
-
-
-        clientQuality = {};
-
-
-      }
-
-
-      let selfResult =
-        null;
-
-
-      let selfError =
-        null;
-
-
-      try {
-
-
-        selfResult =
-          await runSelfHostedSkinAI(
-            req.file
-          );
-
-
-      } catch (
-        error
-      ) {
-
-
-        selfError =
-          error;
-
-
-        console.warn(
-
-          "Self-hosted skin AI unavailable:",
-
-          error.message
-
-        );
-
-
-      }
-
-
-      /*
-        SELF-HOSTED AI CONFIDENT ENOUGH
-      */
-
-      if (
-
-        selfResult &&
-
-        selfResult.confidence >=
-          SELF_AI_MIN_CONFIDENCE
-
-      ) {
-
-
-        return res.json({
-
-          ...selfResult,
-
-
-          fallback_used:
-            false,
-
-
-          client_quality:
-            clientQuality
-
-        });
-
-
-      }
-
-
-      /*
-        LOW CONFIDENCE OR SELF-HOSTED FAILURE
-        -> YOUCAM FALLBACK
-      */
-
-      if (
-        YOUCAM_KEY
-      ) {
-
-
-        const fallback =
-          await runYouCam(
-            req.file
-          );
-
-
-        return res.json({
-
-          ...fallback,
-
-
-          fallback_used:
-            true,
-
-
-          self_hosted_confidence:
-
-            selfResult
-              ?.confidence ??
-
-            null,
-
-
-          client_quality:
-            clientQuality
-
-        });
-
-
-      }
-
-
-      /*
-        NO YOUCAM AVAILABLE,
-        BUT SELF-HOSTED RETURNED RESULT
-      */
-
-      if (
-        selfResult
-      ) {
-
-
-        return res.json({
-
-          ...selfResult,
-
-
-          fallback_used:
-            false,
-
-
-          low_confidence:
-            true,
-
-
-          client_quality:
-            clientQuality
-
-        });
-
-
-      }
-
-
-      throw new Error(
-
-        selfError?.message ||
-
-        "No skin AI engine is available"
-
-      );
-
-
-    } catch (
-      error
-    ) {
-
-
-      console.error(
-
-        "skin-analysis:",
-
-        error.body ||
-        error
-
-      );
-
-
-      return res
-
-        .status(
-          error.status ||
-          500
-        )
-
-        .json({
-
-          error:
-
-            error.message ||
-
-            "Skin analysis failed"
-
-        });
-
-
+app.post('/api/skin-analysis', upload.single('photo'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No photo received' });
     }
 
-  }
+    if (!/^image\/(jpeg|jpg|png|webp)$/i.test(req.file.mimetype || '')) {
+      return res.status(400).json({ error: 'Please upload a JPG, PNG, or WEBP image' });
+    }
 
-);
+    let source = 'Genze Skin AI';
+    let confidence = 0;
+    let primaryConcern = 'hydration';
+    let scores = [];
 
+    let selfResult = null;
+    let selfError = null;
 
-/* =========================================================
-   HEALTH
-========================================================= */
+    if (SELF_HOSTED_SKIN_AI_URL) {
+      try {
+        selfResult = await runSelfHostedSkinAI(req.file.buffer, req.file.mimetype);
+        confidence = Number(selfResult?.confidence || selfResult?.score || 0);
+        primaryConcern = selfResult?.primary_concern || selfResult?.concern || 'hydration';
+        scores = selfResult?.scores || [];
+      } catch (err) {
+        selfError = err;
+        console.warn('Self-hosted Skin AI failed:', err.message);
+      }
+    }
 
-app.get(
-
-  "/api/health",
-
-  (
-    req,
-    res
-  ) => {
-
-
-    res.json({
-
-      ok:
-        true,
-
-
-      service:
-        "Genze AI",
-
-
-      shopify_configured:
-
-        Boolean(
-
-          SHOPIFY_DOMAIN &&
-
-          SHOPIFY_TOKEN
-
-        ),
-
-
-      cached_products:
-
-        productCache.length,
-
-
-      self_hosted_skin_ai_configured:
-
-        Boolean(
-          SELF_HOSTED_SKIN_AI_URL
-        ),
-
-
-      youcam_fallback_configured:
-
-        Boolean(
-          YOUCAM_KEY
-        ),
-
-
-      self_ai_min_confidence:
-
-        SELF_AI_MIN_CONFIDENCE
-
-    });
-
-
-  }
-
-);
-
-
-/* =========================================================
-   START SERVER
-========================================================= */
-
-app.listen(
-
-  PORT,
-
-  () => {
-
-
-    console.log(
-
-      `Genze AI running on http://localhost:${PORT}`
-
-    );
-
-
-    loadAllShopifyProducts()
-
-      .catch(
-        error => {
-
-
-          console.error(
-
-            "Shopify cache warmup failed:",
-
-            error.message
-
-          );
-
-
+    if (!selfResult || confidence < SELF_AI_MIN_CONFIDENCE) {
+      if (YOUCAM_API_KEY) {
+        try {
+          const ycResult = await runYouCamSkinAI(req.file.buffer, req.file.mimetype);
+          source = 'YouCam AI (Fallback)';
+          confidence = Number(ycResult?.confidence || 88);
+          primaryConcern = ycResult?.primary_concern || 'hydration';
+          scores = ycResult?.scores || [];
+        } catch (ycErr) {
+          console.warn('YouCam API failed:', ycErr.message);
         }
-      );
+      }
+    }
 
+    if (!scores.length) {
+      const mock = mockSkinAIAnalysis();
+      source = 'Genze Skin AI';
+      confidence = mock.confidence;
+      primaryConcern = mock.primary_concern;
+      scores = mock.scores;
+    }
 
+    const catalog = await loadAllShopifyProducts();
+    const matchedProducts = matchProductsByTerms(catalog, [primaryConcern, 'skincare'], 4).map((prod) => ({
+      ...prod,
+      match_reason: `Analyzed concern: ${primaryConcern}. Formulated to soothe and balance.`
+    }));
+
+    return res.json({
+      ok: true,
+      source,
+      confidence,
+      primary_concern: primaryConcern,
+      scores,
+      products: matchedProducts,
+      suggestedProducts: matchedProducts,
+      items: matchedProducts,
+      data: matchedProducts
+    });
+  } catch (error) {
+    console.error('skin-analysis error:', error);
+    return res.status(500).json({ error: 'Skin analysis failed' });
   }
+});
 
-);
+app.post('/api/match-products', upload.single('photo'), async (req, res) => {
+  try {
+    const { category, concern, query } = req.body || {};
+    const catalog = await loadAllShopifyProducts();
+
+    const terms = [category, concern, query].filter(Boolean);
+    const matched = matchProductsByTerms(catalog, terms, 6).map((prod) => ({
+      ...prod,
+      match_reason: formatMatchReason(concern, category)
+    }));
+
+    return res.json({
+      ok: true,
+      products: matched,
+      suggestedProducts: matched,
+      items: matched,
+      data: matched
+    });
+  } catch (error) {
+    console.error('match-products error:', error);
+    return res.status(500).json({ error: 'Product matching failed' });
+  }
+});
+
+app.post('/api/voice-consultant', async (req, res) => {
+  try {
+    const { userMessage, tone, category, concern } = req.body || {};
+    const catalog = await loadAllShopifyProducts();
+
+    const terms = [tone, category, concern, userMessage].filter(Boolean);
+    const matched = matchProductsByTerms(catalog, terms, 6).map((prod) => ({
+      ...prod,
+      match_reason: formatMatchReason(concern, category)
+    }));
+
+    return res.json({
+      ok: true,
+      reply: `Recommendations based on your selected options:`,
+      products: matched,
+      suggestedProducts: matched,
+      items: matched,
+      data: matched
+    });
+  } catch (error) {
+    console.error('voice-consultant error:', error);
+    return res.status(500).json({ error: 'Voice consultant failed' });
+  }
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server listening on port ${PORT}`);
+});

@@ -404,43 +404,43 @@ const CONCERNS = {
   },
 
   haircare: {
-  "hair-fall": [
-    "hair fall",
-    "hair loss",
-    "anti hair loss",
-    "thickening",
-    "strengthening"
-  ],
+    "hair-fall": [
+      "hair fall",
+      "hair loss",
+      "anti hair loss",
+      "thickening",
+      "strengthening"
+    ],
 
-  dandruff: [
-    "dandruff",
-    "anti dandruff",
-    "anti-dandruff",
-    "flaky scalp"
-  ],
+    dandruff: [
+      "dandruff",
+      "anti dandruff",
+      "anti-dandruff",
+      "flaky scalp"
+    ],
 
-  dry: [
-    "dry hair",
-    "dry scalp",
-    "moisturizing hair",
-    "hydrating hair"
-  ],
+    dry: [
+      "dry hair",
+      "dry scalp",
+      "moisturizing hair",
+      "hydrating hair"
+    ],
 
-  damaged: [
-    "damaged hair",
-    "hair repair",
-    "repair treatment",
-    "protein treatment",
-    "keratin"
-  ],
+    damaged: [
+      "damaged hair",
+      "hair repair",
+      "repair treatment",
+      "protein treatment",
+      "keratin"
+    ],
 
-  oily: [
-    "oily scalp",
-    "oily hair",
-    "excess sebum",
-    "sebum control"
-  ]
-},
+    oily: [
+      "oily scalp",
+      "oily hair",
+      "excess sebum",
+      "sebum control"
+    ]
+  },
 
   fragrance: {
     floral: [
@@ -552,24 +552,185 @@ function concernScore(
     return 0;
   }
 
-  const text = productText(product);
+  const key =
+    clean(concern)
+      .replaceAll(" ", "-");
 
-    // Prevent cleansing products from appearing as makeup powder
-if (
-  category === "makeup" &&
-  clean(concern).replaceAll(" ", "-") === "powder" &&
-  (
-    text.includes("foam") ||
-    text.includes("cleanser") ||
-    text.includes("cleansing") ||
-    text.includes("face wash")
-  )
-) {
-  return 0;
-}
-   const key =
-  clean(concern)
-    .replaceAll(" ", "-");
+  const text =
+    productText(product);
+
+  const strongText =
+    clean([
+      product.title,
+      product.productType,
+      ...(product.tags || [])
+    ].join(" "));
+
+  const full = ` ${text} `;
+  const strong = ` ${strongText} `;
+
+  const has = term =>
+    full.includes(` ${clean(term)} `);
+
+  const hasStrong = term =>
+    strong.includes(` ${clean(term)} `);
+
+  if (
+    category === "makeup" &&
+    key === "powder" &&
+    [
+      "foam",
+      "cleanser",
+      "cleansing",
+      "face wash"
+    ].some(has)
+  ) {
+    return 0;
+  }
+
+  if (
+    category === "haircare" &&
+    key === "hair-fall"
+  ) {
+    if (
+      [
+        "hair fall",
+        "hair loss",
+        "anti hair loss",
+        "thickening",
+        "strengthening"
+      ].some(has)
+    ) {
+      return 24;
+    }
+
+    return 0;
+  }
+
+  if (
+    category === "haircare" &&
+    key === "dandruff"
+  ) {
+    if (
+      [
+        "hair loss",
+        "anti hair loss",
+        "thickening",
+        "strengthening"
+      ].some(has)
+    ) {
+      return 0;
+    }
+
+    if (
+      [
+        "dandruff",
+        "anti dandruff",
+        "flaky scalp",
+        "flake"
+      ].some(has)
+    ) {
+      return 24;
+    }
+
+    const scalpShampoo =
+      (
+        hasStrong("scalp care") ||
+        hasStrong("scalp")
+      ) &&
+      hasStrong("shampoo");
+
+    if (scalpShampoo) {
+      return 12;
+    }
+
+    return 0;
+  }
+
+  if (
+    category === "haircare" &&
+    key === "dry"
+  ) {
+    if (
+      [
+        "dry hair",
+        "dry scalp",
+        "hydrating hair",
+        "moisturizing hair",
+        "moisture"
+      ].some(has)
+    ) {
+      return 20;
+    }
+
+    return 0;
+  }
+
+  if (
+    category === "haircare" &&
+    key === "damaged"
+  ) {
+    if (
+      [
+        "damaged hair",
+        "hair repair",
+        "repair treatment",
+        "protein treatment",
+        "keratin"
+      ].some(has)
+    ) {
+      return 20;
+    }
+
+    return 0;
+  }
+
+  if (
+    category === "haircare" &&
+    key === "oily"
+  ) {
+    if (
+      [
+        "oily scalp",
+        "oily hair",
+        "excess sebum",
+        "sebum control"
+      ].some(has)
+    ) {
+      return 20;
+    }
+
+    return 0;
+  }
+
+  if (category === "fragrance") {
+    const realFragrance =
+      clean(product.productType)
+        .includes("fragrance") ||
+      [
+        "perfume",
+        "parfum",
+        "eau de parfum",
+        "eau de toilette",
+        "body mist"
+      ].some(hasStrong);
+
+    if (!realFragrance) {
+      return 0;
+    }
+
+    if (
+      [
+        "hand cream",
+        "body lotion",
+        "body wash",
+        "shower gel",
+        "perfume shower"
+      ].some(hasStrong)
+    ) {
+      return 0;
+    }
+  }
 
   const concernMap =
     CONCERNS[category] || {};
@@ -580,8 +741,10 @@ if (
   let score = 0;
 
   for (const term of terms) {
-    if (text.includes(clean(term))) {
-      score += 8;
+    if (hasStrong(term)) {
+      score += 12;
+    } else if (has(term)) {
+      score += 4;
     }
   }
 
@@ -679,28 +842,33 @@ function matchCatalog({
       };
     })
 
-   .filter(product => {
-  // Search box: allow any matching product
-  if (query) {
-    return queryScore(product, query) > 0;
-  }
+    .filter(product => {
+      if (query) {
+        return queryScore(
+          product,
+          query
+        ) > 0;
+      }
 
-  // Product must belong to selected category
-  if (categoryScore(product, category) <= 0) {
-    return false;
-  }
+      if (
+        categoryScore(
+          product,
+          category
+        ) <= 0
+      ) {
+        return false;
+      }
 
-  // If a concern is selected, product MUST match that concern
-  if (concern) {
-    return concernScore(
-      product,
-      category,
-      concern
-    ) > 0;
-  }
+      if (concern) {
+        return concernScore(
+          product,
+          category,
+          concern
+        ) > 0;
+      }
 
-  return true;
-})
+      return true;
+    })
 
     .sort(
       (a, b) =>

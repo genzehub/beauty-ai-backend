@@ -167,7 +167,7 @@ async function loadAllShopifyProducts() {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "X-Shopify-Storefront-Access-Token": SHOPIFY_TOKEN
+              "Shopify-Storefront-Private-Token": SHOPIFY_TOKEN
             },
             body: JSON.stringify({
               query,

@@ -283,7 +283,7 @@ async function loadAllShopifyProducts() {
                   "Content-Type":
                     "application/json",
 
-                  "X-Shopify-Storefront-Access-Token":
+                 "Shopify-Storefront-Private-Token":
                     SHOPIFY_TOKEN
                 },
 

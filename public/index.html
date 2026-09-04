@@ -345,7 +345,15 @@
 
   </main>
 
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.js"></script>
+<script type="module">
+  import {
+    FilesetResolver,
+    FaceLandmarker
+  } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/+esm";
+
+  window.FilesetResolver = FilesetResolver;
+  window.FaceLandmarker = FaceLandmarker;
+</script>
   <script src="app.js"></script>
 
 </body>

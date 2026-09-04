@@ -620,53 +620,30 @@ function concernScore(
 
   /* DRY HAIR */
 
+if (
+  category === "haircare" &&
+  key === "dry"
+) {
   if (
-    category === "haircare" &&
-    key === "dry"
-  ) {
-    return [
-      "dry hair",
-      "dry scalp",
-      "hydrating hair",
-      "moisturizing hair",
-      "moisture"
+    [
+      "foot",
+      "feet",
+      "heel"
     ].some(has)
-      ? 20
-      : 0;
+  ) {
+    return 0;
   }
 
-  /* DAMAGED HAIR */
-
-  if (
-    category === "haircare" &&
-    key === "damaged"
-  ) {
-    return [
-      "damaged hair",
-      "hair repair",
-      "repair treatment",
-      "protein treatment",
-      "keratin"
-    ].some(has)
-      ? 20
-      : 0;
-  }
-
-  /* OILY HAIR */
-
-  if (
-    category === "haircare" &&
-    key === "oily"
-  ) {
-    return [
-      "oily scalp",
-      "oily hair",
-      "excess sebum",
-      "sebum control"
-    ].some(has)
-      ? 20
-      : 0;
-  }
+  return [
+    "dry hair",
+    "dry scalp",
+    "hydrating hair",
+    "moisturizing hair",
+    "moisture"
+  ].some(has)
+    ? 20
+    : 0;
+}
 
   /* FRAGRANCE FALSE MATCH FIX */
 

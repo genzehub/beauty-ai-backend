@@ -710,8 +710,6 @@ if (
     if (!realFragrance) {
       return 0;
     }
-
-    if (
    if (
   [
     "hand cream",
@@ -727,7 +725,6 @@ if (
   return 0;
 }
     }
-  }
 
   const terms =
     (CONCERNS[category] || {})[key] || [];

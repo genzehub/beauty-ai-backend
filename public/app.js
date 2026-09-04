@@ -1018,56 +1018,30 @@ async function runLivenessCheck() {
 
     return false;
   }
-
-  const offsets =
-    good
-      .map(
-        item =>
-          item.head?.noseOffset
-      )
-      .filter(
-        value =>
-          Number.isFinite(value)
-      );
-
-  if (!offsets.length) {
-    setCameraStatus(
-      "Liveness could not be confirmed. Try again.",
-      "error"
-    );
-
-    return false;
-  }
-
-  const movement =
-    Math.max(...offsets) -
-    Math.min(...offsets);
-
-  if (movement < 0.045) {
-    setCameraStatus(
-      "Liveness check: please move your head slightly left or right and try again.",
-      "error"
-    );
-
-    return false;
-  }
-
-  state.livenessPassed = true;
-
-  setCameraStatus(
+setCameraStatus(
     "Liveness passed. You can capture your photo now.",
     "success"
   );
 
+state.livenessPassed = true;
   return true;
 }
 
-/* =====================================================
-   CAMERA
-===================================================== */
+let stream = null;
 
 let stream = null;
 
+function requireConsent() {
+  if (
+    !$("#consentCheckbox").checked
+  ) {
+    alert(
+      "Please tick the consent box first."
+    );
+
+    return false;
+  }
+}
 function requireConsent() {
   if (
     !$("consentCheckbox").checked

@@ -1085,14 +1085,53 @@ function concernScore(
   }
 
 
-  const key =
-    clean(
-      concern
-    ).replace(
-      / /g,
-      "-"
-    );
+ function concernScore(
+  product,
+  category,
+  concern
+) {
 
+  if (!concern) {
+    return 0;
+  }
+
+  const rawKey =
+    clean(concern).replace(/ /g, "-");
+
+  const CONCERN_ALIASES = {
+    "dry-hair": "dry",
+    "damaged-hair": "damaged",
+    "oily-scalp": "oily",
+    "hair-fall": "hair-fall",
+    "dandruff": "dandruff",
+    "powder-compact": "powder",
+    "powder": "powder",
+    "foundation-cushion": "foundation",
+    "concealer": "concealer",
+    "lip-color": "lip-color",
+    "warm-vanilla-fragrance": "vanilla",
+    "vanilla": "vanilla",
+    "floral": "floral",
+    "fresh-clean": "fresh",
+    "fresh": "fresh",
+    "edp-edt-longevity": "longlasting",
+    "long-lasting": "longlasting",
+    "longlasting": "longlasting",
+    "hydration": "hydration",
+    "acne-breakouts": "acne",
+    "acne": "acne",
+    "pores-oil": "pores",
+    "pores": "pores",
+    "brightening": "brightening",
+    "redness-calming": "redness",
+    "redness": "redness",
+    "anti-aging": "anti-aging",
+    "sensitive-skin": "sensitive",
+    "sensitive": "sensitive"
+  };
+
+  const key =
+    CONCERN_ALIASES[rawKey] || rawKey;
 
   const text =
     productText(

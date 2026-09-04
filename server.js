@@ -404,40 +404,43 @@ const CONCERNS = {
   },
 
   haircare: {
-    "hair-fall": [
-      "hair fall",
-      "hair loss",
-      "strengthening",
-      "scalp"
-    ],
+  "hair-fall": [
+    "hair fall",
+    "hair loss",
+    "anti hair loss",
+    "thickening",
+    "strengthening"
+  ],
 
-    dandruff: [
-      "dandruff",
-      "scalp",
-      "clarifying"
-    ],
+  dandruff: [
+    "dandruff",
+    "anti dandruff",
+    "anti-dandruff",
+    "flaky scalp"
+  ],
 
-    dry: [
-  "dry hair",
-  "moisture",
-  "hydrating",
-  "repair"
-],
+  dry: [
+    "dry hair",
+    "dry scalp",
+    "moisturizing hair",
+    "hydrating hair"
+  ],
 
+  damaged: [
+    "damaged hair",
+    "hair repair",
+    "repair treatment",
+    "protein treatment",
+    "keratin"
+  ],
 
-    damaged: [
-      "damaged",
-      "repair",
-      "protein",
-      "keratin"
-    ],
-
-    oily: [
-      "oily scalp",
-      "sebum",
-      "clarifying"
-    ]
-  },
+  oily: [
+    "oily scalp",
+    "oily hair",
+    "excess sebum",
+    "sebum control"
+  ]
+},
 
   fragrance: {
     floral: [

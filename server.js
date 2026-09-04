@@ -1058,7 +1058,8 @@ const HD_ACTIONS = [
   "hd_radiance",
   "hd_moisture",
   "hd_dark_circle",
-  "hd_eye_bag"
+"hd_eye_bag",
+"hd_skin_type"
 ];
 
 async function createSkinTask(

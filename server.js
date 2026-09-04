@@ -550,9 +550,22 @@ function concernScore(
 
   const text = productText(product);
 
-  const key =
-    clean(concern)
-      .replaceAll(" ", "-");
+    // Prevent cleansing products from appearing as makeup powder
+if (
+  category === "makeup" &&
+  clean(concern).replaceAll(" ", "-") === "powder" &&
+  (
+    text.includes("foam") ||
+    text.includes("cleanser") ||
+    text.includes("cleansing") ||
+    text.includes("face wash")
+  )
+) {
+  return 0;
+}
+   const key =
+  clean(concern)
+    .replaceAll(" ", "-");
 
   const concernMap =
     CONCERNS[category] || {};

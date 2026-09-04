@@ -720,7 +720,7 @@ if (
   "perfume shower",
   "shampoo",
   "hair treatment"
-]
+
       ].some(hasStrong)
     ) {
       return 0;

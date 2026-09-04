@@ -1178,10 +1178,14 @@ function normalizeAnalysis(
             ""
           ),
 
-        score:
-          item?.ui_score ??
-          item?.raw_score ??
-          null
+     score:
+  item?.ui_score ??
+  item?.raw_score ??
+  item?.skin_type ??
+  item?.value ??
+  item?.label ??
+  item?.result ??
+  null
       }))
   };
 }

@@ -1224,7 +1224,10 @@ app.post(
         await pollSkinTask(
           taskId
         );
-
+console.log(
+  "YOUCAM RAW RESULT:",
+  JSON.stringify(result, null, 2)
+);
       return res.json(
         normalizeAnalysis(
           result

@@ -660,11 +660,73 @@ $("toneSend")
             mode: "makeup"
           });
 
-        renderAnalysis(lastAnalysis);
+     const toneSection = $("toneProductSection");
+const toneResults = $("toneProductResults");
+const step2Section = $("step2Section");
 
-        renderProducts(products);
+if (toneResults) {
+  const list = Array.isArray(products)
+    ? products
+    : products?.products || [];
 
-        results?.classList.remove("hidden");
+  if (!list.length) {
+    toneResults.innerHTML = `
+      <p>No strong matching products found.</p>
+    `;
+  } else {
+    toneResults.innerHTML = list
+      .map(product => `
+        <article class="product">
+
+          ${
+            product.image
+              ? `
+                <img
+                  src="${safeUrl(product.image)}"
+                  alt="${escapeHtml(product.title || "Product")}"
+                  loading="lazy"
+                >
+              `
+              : ""
+          }
+
+          <h4>
+            ${escapeHtml(product.title || "Recommended product")}
+          </h4>
+
+          ${
+            product.price
+              ? `
+                <p>
+                  <strong>
+                    ${escapeHtml(product.currency || "")}
+                    ${escapeHtml(product.price)}
+                  </strong>
+                </p>
+              `
+              : ""
+          }
+
+          <p>
+            ${escapeHtml(product.why || "Matched product")}
+          </p>
+
+          <a
+            href="${safeUrl(product.url || "https://genzehub.co.in")}"
+            target="_blank"
+            rel="noreferrer"
+          >
+            View Product →
+          </a>
+
+        </article>
+      `)
+      .join("");
+  }
+}
+
+toneSection?.classList.remove("hidden");
+step2Section?.classList.remove("hidden");
 
         setStatus(
           `Matches for ${tone} are ready.`

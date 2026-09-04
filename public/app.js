@@ -1004,15 +1004,28 @@ $("captureBtn")
         1
       );
 
-      context.drawImage(
-        video,
-        0,
-        0,
-        canvas.width,
-        canvas.height
-      );
+     const videoWidth = video.videoWidth;
+const videoHeight = video.videoHeight;
 
+const cropScale = 0.65;
 
+const cropWidth = videoWidth * cropScale;
+const cropHeight = videoHeight * cropScale;
+
+const sx = (videoWidth - cropWidth) / 2;
+const sy = (videoHeight - cropHeight) / 2;
+
+context.drawImage(
+  video,
+  sx,
+  sy,
+  cropWidth,
+  cropHeight,
+  0,
+  0,
+  canvas.width,
+  canvas.height
+)
       canvas.toBlob(
         blob => {
 

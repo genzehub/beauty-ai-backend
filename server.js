@@ -1069,23 +1069,7 @@ function categoryScore(
 
   return score;
 
-}
-
-
 function concernScore(
-  product,
-  category,
-  concern
-) {
-
-  if (!concern) {
-
-    return 0;
-
-  }
-
-
- function concernScore(
   product,
   category,
   concern
@@ -1097,7 +1081,6 @@ function concernScore(
 
   const rawKey =
     clean(concern).replace(/ /g, "-");
-
   const CONCERN_ALIASES = {
     "dry-hair": "dry",
     "damaged-hair": "damaged",

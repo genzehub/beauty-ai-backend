@@ -312,42 +312,26 @@ async function selectConcern(
 ===================================================== */
 
 async function selectTone(tone) {
-  state.tone =
-    tone;
+  state.tone = tone;
 
   document
-    .querySelectorAll(
-      "[data-tone]"
-    )
+    .querySelectorAll("[data-tone]")
     .forEach(button => {
-
       button.classList.toggle(
         "active",
-        button.dataset.tone ===
-        tone
+        button.dataset.tone === tone
       );
     });
-
 
   userMessage(tone);
 
   updateStatus();
 
   assistantMessage(
-    `Thank you. I’ve saved ${tone.toLowerCase()} as your skin tone. Now choose a beauty category and your main concern.`
+    `Thank you. I’ve saved ${tone.toLowerCase()} as your skin tone. I’m finding matching products for you now.`
   );
 
-
-  /*
-    Makeup can immediately show
-    complexion suggestions.
-  */
-
-  if (
-    state.category === "makeup"
-  ) {
-    await loadProducts();
-  }
+  await loadProducts();
 }
 
 

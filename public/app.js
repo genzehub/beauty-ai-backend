@@ -1192,3 +1192,4 @@ $("uploadInput")
 
 renderConcernOptions();
 updateStatus();
+initMediaPipe();

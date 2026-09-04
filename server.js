@@ -914,7 +914,7 @@ app.post(
           })
 
           .filter(product =>
-            product.match_score > 10
+           product.match_score >= 10
           )
 
           .sort(

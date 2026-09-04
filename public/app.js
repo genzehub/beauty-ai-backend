@@ -1,22 +1,19 @@
-const $ =
-  id =>
-    document.getElementById(id);
-
+const $ = id => document.getElementById(id);
 
 const state = {
   tone: "",
   category: "skincare",
   concern: "",
-  products: []
+  products: [],
+  lastAnalysis: null,
+  livenessPassed: false
 };
 
-
 /* =====================================================
-   CONCERNS
+   OPTIONS
 ===================================================== */
 
 const CONCERN_OPTIONS = {
-
   skincare: [
     ["Hydration", "hydration"],
     ["Acne & breakouts", "acne"],
@@ -50,38 +47,29 @@ const CONCERN_OPTIONS = {
   ]
 };
 
-
 /* =====================================================
-   HTML SAFETY
+   HELPERS
 ===================================================== */
 
 function escapeHtml(value = "") {
-  return String(value)
-    .replace(
-      /[&<>"']/g,
-      character => ({
+  return String(value).replace(
+    /[&<>"']/g,
+    c =>
+      ({
         "&": "&amp;",
         "<": "&lt;",
         ">": "&gt;",
         '"': "&quot;",
         "'": "&#039;"
-      }[character])
-    );
+      })[c]
+  );
 }
-
 
 function safeUrl(value) {
   try {
-    const url =
-      new URL(
-        value,
-        location.origin
-      );
+    const url = new URL(value, location.origin);
 
-    if (
-      ["http:", "https:"]
-        .includes(url.protocol)
-    ) {
+    if (["http:", "https:"].includes(url.protocol)) {
       return url.href;
     }
 
@@ -91,6 +79,14 @@ function safeUrl(value) {
   }
 }
 
+function setCameraStatus(text, type = "") {
+  const box = $("cameraStatus");
+
+  box.classList.remove("hidden");
+  box.textContent = text;
+
+  box.dataset.type = type;
+}
 
 /* =====================================================
    CHAT
@@ -99,15 +95,12 @@ function safeUrl(value) {
 function assistantMessage(text) {
   const chat = $("chat");
 
-  const wrapper =
-    document.createElement("div");
+  const wrapper = document.createElement("div");
 
-  wrapper.className =
-    "assistant-message";
+  wrapper.className = "assistant-message";
 
   wrapper.innerHTML = `
     <span class="avatar">G</span>
-
     <div class="bubble assistant">
       ${escapeHtml(text)}
     </div>
@@ -121,15 +114,12 @@ function assistantMessage(text) {
   });
 }
 
-
 function userMessage(text) {
   const chat = $("chat");
 
-  const wrapper =
-    document.createElement("div");
+  const wrapper = document.createElement("div");
 
-  wrapper.className =
-    "user-message";
+  wrapper.className = "user-message";
 
   wrapper.innerHTML = `
     <div class="bubble user">
@@ -140,7 +130,6 @@ function userMessage(text) {
   chat.appendChild(wrapper);
 }
 
-
 /* =====================================================
    STATUS
 ===================================================== */
@@ -149,49 +138,37 @@ function updateStatus() {
   const parts = [];
 
   if (state.tone) {
-    parts.push(
-      `Skin tone: ${state.tone}`
-    );
+    parts.push(`Skin tone: ${state.tone}`);
   }
 
   if (state.category) {
     parts.push(
-      state.category
-        .charAt(0)
-        .toUpperCase() +
-      state.category.slice(1)
+      state.category.charAt(0).toUpperCase() +
+        state.category.slice(1)
     );
   }
 
   if (state.concern) {
     parts.push(
-      state.concern
-        .replaceAll("-", " ")
+      state.concern.replaceAll("-", " ")
     );
   }
 
-  $("consultantStatus")
-    .textContent =
-      parts.join(" · ") ||
-      "Choose your skin tone to begin";
+  $("consultantStatus").textContent =
+    parts.join(" · ") ||
+    "Choose your skin tone to begin";
 }
 
-
 /* =====================================================
-   CATEGORY UI
+   CATEGORY / CONCERN
 ===================================================== */
 
 function renderConcernOptions() {
-  const select =
-    $("concernSelect");
-
-  const quick =
-    $("quickConcerns");
+  const select = $("concernSelect");
+  const quick = $("quickConcerns");
 
   const options =
-    CONCERN_OPTIONS[
-      state.category
-    ] || [];
+    CONCERN_OPTIONS[state.category] || [];
 
   select.innerHTML = `
     <option value="">
@@ -201,74 +178,38 @@ function renderConcernOptions() {
 
   quick.innerHTML = "";
 
-  for (
-    const [label, value]
-    of options
-  ) {
+  for (const [label, value] of options) {
+    const option = document.createElement("option");
 
-    const option =
-      document.createElement(
-        "option"
-      );
+    option.value = value;
+    option.textContent = label;
 
-    option.value =
-      value;
+    select.appendChild(option);
 
-    option.textContent =
-      label;
+    const button = document.createElement("button");
 
-    select.appendChild(
-      option
-    );
+    button.type = "button";
+    button.dataset.concern = value;
+    button.textContent = label;
 
+    button.addEventListener("click", () => {
+      selectConcern(value, label);
+    });
 
-    const button =
-      document.createElement(
-        "button"
-      );
-
-    button.type =
-      "button";
-
-    button.dataset.concern =
-      value;
-
-    button.textContent =
-      label;
-
-    button.addEventListener(
-      "click",
-      () => {
-        selectConcern(
-          value,
-          label
-        );
-      }
-    );
-
-    quick.appendChild(
-      button
-    );
+    quick.appendChild(button);
   }
 }
 
-
 function selectCategory(category) {
-  state.category =
-    category;
-
+  state.category = category;
   state.concern = "";
 
   document
-    .querySelectorAll(
-      "[data-category]"
-    )
+    .querySelectorAll("[data-category]")
     .forEach(button => {
-
       button.classList.toggle(
         "active",
-        button.dataset.category ===
-        category
+        button.dataset.category === category
       );
     });
 
@@ -276,36 +217,25 @@ function selectCategory(category) {
   updateStatus();
 
   assistantMessage(
-    `Okay. Choose your main ${category} concern and I’ll find suitable Genze Hub products.`
+    `Choose your main ${category} concern and I’ll find suitable Genze Hub products.`
   );
 }
 
+async function selectConcern(concern, label) {
+  state.concern = concern;
 
-/* =====================================================
-   CONCERN
-===================================================== */
-
-async function selectConcern(
-  concern,
-  label
-) {
-  state.concern =
-    concern;
-
-  $("concernSelect").value =
-    concern;
+  $("concernSelect").value = concern;
 
   userMessage(label);
 
   updateStatus();
 
   assistantMessage(
-    `Searching Genze Hub for ${label.toLowerCase()} products that fit your choices.`
+    `Searching Genze Hub for ${label.toLowerCase()} products.`
   );
 
   await loadProducts();
 }
-
 
 /* =====================================================
    TONE
@@ -328,81 +258,57 @@ async function selectTone(tone) {
   updateStatus();
 
   assistantMessage(
-    `Thank you. I’ve saved ${tone.toLowerCase()} as your skin tone. I’m finding matching products for you now.`
+    `I’ve saved ${tone.toLowerCase()} as your skin tone.`
   );
 
   await loadProducts();
 }
 
-
 /* =====================================================
-   API
+   PRODUCT API
 ===================================================== */
 
-async function requestProducts(
-  query = ""
-) {
-  const response =
-    await fetch(
-      "/api/match-products",
-      {
-        method:
-          "POST",
+async function requestProducts(query = "", analysis = null) {
+  const response = await fetch(
+    "/api/match-products",
+    {
+      method: "POST",
 
-        headers: {
-          "Content-Type":
-            "application/json"
-        },
+      headers: {
+        "Content-Type": "application/json"
+      },
 
-        body:
-          JSON.stringify({
-            tone:
-              state.tone,
+      body: JSON.stringify({
+        tone: state.tone,
+        category: state.category,
+        concern: state.concern,
+        query,
+        analysis
+      })
+    }
+  );
 
-            category:
-              state.category,
-
-            concern:
-              state.concern,
-
-            query
-          })
-      }
-    );
-
-
-  const data =
-    await response
-      .json()
-      .catch(
-        () => ({})
-      );
-
+  const data = await response
+    .json()
+    .catch(() => ({}));
 
   if (!response.ok) {
     throw new Error(
       data?.error ||
-      "Products could not be loaded"
+        "Products could not be loaded"
     );
   }
 
   return data;
 }
 
-
-/* =====================================================
-   PRODUCTS
-===================================================== */
-
 async function loadProducts(
-  query = ""
+  query = "",
+  analysis = null
 ) {
-  const box =
-    $("consultantProducts");
+  const box = $("consultantProducts");
 
-  box.classList.remove(
-    "hidden"
-  );
+  box.classList.remove("hidden");
 
   box.innerHTML = `
     <div class="loading">
@@ -410,36 +316,26 @@ async function loadProducts(
     </div>
   `;
 
-
   try {
-
-    const data =
-      await requestProducts(
-        query
-      );
-
-    state.products =
-      data.products || [];
-
-    renderProducts(
-      state.products
+    const data = await requestProducts(
+      query,
+      analysis
     );
 
+    state.products = data.products || [];
 
-    if (
-      state.products.length
-    ) {
+    renderProducts(state.products);
+
+    if (state.products.length) {
       assistantMessage(
-        `I found ${state.products.length} matching Genze Hub choices below.`
+        `I found ${state.products.length} matching Genze Hub products.`
       );
     } else {
       assistantMessage(
-        "I couldn’t find a strong exact match. Try another concern or search term."
+        "I couldn’t find a strong exact match. Try another concern."
       );
     }
-
   } catch (error) {
-
     console.error(error);
 
     box.innerHTML = `
@@ -450,10 +346,8 @@ async function loadProducts(
   }
 }
 
-
 function renderProducts(products) {
-  const box =
-    $("consultantProducts");
+  const box = $("consultantProducts");
 
   if (!products.length) {
     box.innerHTML = `
@@ -465,177 +359,133 @@ function renderProducts(products) {
     return;
   }
 
+  box.innerHTML = products
+    .slice(0, 6)
+    .map(
+      product => `
+      <article class="product-card">
 
-  box.innerHTML =
-    products
-      .slice(0, 6)
-      .map(product => `
+        <div class="product-image">
+          ${
+            product.image
+              ? `
+              <img
+                src="${safeUrl(product.image)}"
+                alt="${escapeHtml(product.title)}"
+                loading="lazy"
+              >
+            `
+              : ""
+          }
+        </div>
 
-        <article class="product-card">
+        <div class="product-copy">
 
-          <div class="product-image">
-
-            ${
-              product.image
-                ? `
-                  <img
-                    src="${safeUrl(
-                      product.image
-                    )}"
-                    alt="${escapeHtml(
-                      product.title
-                    )}"
-                    loading="lazy"
-                  >
-                `
-                : ""
-            }
-
-          </div>
-
-
-          <div class="product-copy">
-
-            <div class="product-meta">
-              ${escapeHtml(
-                product.vendor ||
-                "Genze Hub"
-              )}
-
-              ${
-                product.category
-                  ? ` · ${escapeHtml(
-                      product.category
-                    )}`
-                  : ""
-              }
-            </div>
-
-
-            <h3>
-              ${escapeHtml(
-                product.title
-              )}
-            </h3>
-
+          <div class="product-meta">
+            ${escapeHtml(
+              product.vendor || "Genze Hub"
+            )}
 
             ${
-              product.price
-                ? `
-                  <div class="product-price">
-                    ${escapeHtml(
-                      product.currency
-                    )}
-                    ${escapeHtml(
-                      product.price
-                    )}
-                  </div>
-                `
+              product.category
+                ? ` · ${escapeHtml(
+                    product.category
+                  )}`
                 : ""
             }
-
-
-            <a
-              href="${safeUrl(
-                product.url
-              )}"
-              target="_blank"
-              rel="noreferrer"
-            >
-              View product →
-            </a>
-
           </div>
 
-        </article>
+          <h3>
+            ${escapeHtml(product.title)}
+          </h3>
 
-      `)
-      .join("");
+          ${
+            product.price
+              ? `
+              <div class="product-price">
+                ${escapeHtml(product.currency)}
+                ${escapeHtml(product.price)}
+              </div>
+            `
+              : ""
+          }
+
+          ${
+            product.match_reason
+              ? `
+              <div class="product-match-reason">
+                ${escapeHtml(
+                  product.match_reason
+                )}
+              </div>
+            `
+              : ""
+          }
+
+          <a
+            href="${safeUrl(product.url)}"
+            target="_blank"
+            rel="noreferrer"
+          >
+            View product →
+          </a>
+
+        </div>
+
+      </article>
+    `
+    )
+    .join("");
 }
 
-
 /* =====================================================
-   TONE BUTTONS
+   BUTTON EVENTS
 ===================================================== */
 
 document
-  .querySelectorAll(
-    "[data-tone]"
-  )
+  .querySelectorAll("[data-tone]")
   .forEach(button => {
-
-    button.addEventListener(
-      "click",
-      () => {
-        selectTone(
-          button.dataset.tone
-        );
-      }
-    );
-
+    button.addEventListener("click", () => {
+      selectTone(button.dataset.tone);
+    });
   });
-
-
-/* =====================================================
-   CATEGORY BUTTONS
-===================================================== */
 
 document
-  .querySelectorAll(
-    "[data-category]"
-  )
+  .querySelectorAll("[data-category]")
   .forEach(button => {
-
-    button.addEventListener(
-      "click",
-      () => {
-        selectCategory(
-          button.dataset.category
-        );
-      }
-    );
-
-  });
-
-
-/* =====================================================
-   CONCERN SELECT
-===================================================== */
-
-$("concernSelect")
-  .addEventListener(
-    "change",
-    event => {
-
-      const value =
-        event.target.value;
-
-      if (!value) {
-        return;
-      }
-
-      const option =
-        event.target
-          .selectedOptions?.[0];
-
-      selectConcern(
-        value,
-        option?.textContent ||
-        value
+    button.addEventListener("click", () => {
+      selectCategory(
+        button.dataset.category
       );
-    }
-  );
+    });
+  });
 
+$("concernSelect").addEventListener(
+  "change",
+  event => {
+    const value = event.target.value;
+
+    if (!value) {
+      return;
+    }
+
+    const option =
+      event.target.selectedOptions?.[0];
+
+    selectConcern(
+      value,
+      option?.textContent || value
+    );
+  }
+);
 
 /* =====================================================
    SEARCH
 ===================================================== */
 
 async function submitSearch() {
-  const query =
-    $("searchInput")
-      .value
-      .trim();
+  const query = $("searchInput")
+    .value.trim();
 
   if (!query) {
     return;
@@ -650,121 +500,87 @@ async function submitSearch() {
   await loadProducts(query);
 }
 
+$("searchBtn").addEventListener(
+  "click",
+  submitSearch
+);
 
-$("searchBtn")
-  .addEventListener(
-    "click",
-    submitSearch
-  );
-
-
-$("searchInput")
-  .addEventListener(
-    "keydown",
-    event => {
-
-      if (
-        event.key === "Enter"
-      ) {
-        submitSearch();
-      }
+$("searchInput").addEventListener(
+  "keydown",
+  event => {
+    if (event.key === "Enter") {
+      submitSearch();
     }
-  );
-
+  }
+);
 
 /* =====================================================
-   VOICE OUTPUT
+   VOICE
 ===================================================== */
 
-$("voiceBtn")
-  .addEventListener(
-    "click",
-    () => {
+$("voiceBtn").addEventListener(
+  "click",
+  () => {
+    if (!("speechSynthesis" in window)) {
+      alert(
+        "Voice output is not supported in this browser."
+      );
 
-      if (
-        !("speechSynthesis" in window)
-      ) {
-        alert(
-          "Voice output is not supported in this browser."
-        );
-
-        return;
-      }
-
-      const text =
-        "Welcome to Genze Hub. Choose your skin tone, beauty category, and main concern.";
-
-      window
-        .speechSynthesis
-        .cancel();
-
-      window
-        .speechSynthesis
-        .speak(
-          new SpeechSynthesisUtterance(
-            text
-          )
-        );
+      return;
     }
-  );
 
+    const text =
+      "Welcome to Genze Hub. Choose your skin tone, beauty category, and main concern.";
 
-/* =====================================================
-   VOICE INPUT
-===================================================== */
+    window.speechSynthesis.cancel();
 
-$("micBtn")
-  .addEventListener(
-    "click",
-    () => {
+    window.speechSynthesis.speak(
+      new SpeechSynthesisUtterance(text)
+    );
+  }
+);
 
-      const SpeechRecognition =
-        window.SpeechRecognition ||
-        window.webkitSpeechRecognition;
+$("micBtn").addEventListener(
+  "click",
+  () => {
+    const SpeechRecognition =
+      window.SpeechRecognition ||
+      window.webkitSpeechRecognition;
 
-      if (!SpeechRecognition) {
-        alert(
-          "Voice input is not supported in this browser."
-        );
+    if (!SpeechRecognition) {
+      alert(
+        "Voice input is not supported in this browser."
+      );
 
-        return;
-      }
-
-      const recognition =
-        new SpeechRecognition();
-
-      recognition.lang =
-        "en-US";
-
-      recognition.interimResults =
-        false;
-
-      recognition.onresult =
-        event => {
-
-          const transcript =
-            event.results[0][0]
-              .transcript;
-
-          $("searchInput").value =
-            transcript;
-
-          submitSearch();
-        };
-
-      recognition.start();
+      return;
     }
-  );
 
+    const recognition =
+      new SpeechRecognition();
+
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+
+    recognition.onresult = event => {
+      const transcript =
+        event.results[0][0].transcript;
+
+      $("searchInput").value =
+        transcript;
+
+      submitSearch();
+    };
+
+    recognition.start();
+  }
+);
 
 /* =====================================================
-   CAMERA
-===================================================== */
-/* =====================================================
-   MEDIAPIPE FACE ENGINE
+   MEDIAPIPE
 ===================================================== */
 
-let faceLandmarker = null;
+let faceLandmarkerImage = null;
+let faceLandmarkerVideo = null;
 let mediaPipeReady = false;
 
 async function initMediaPipe() {
@@ -774,16 +590,31 @@ async function initMediaPipe() {
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
       );
 
-    faceLandmarker =
+    const modelPath =
+      "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task";
+
+    faceLandmarkerImage =
       await FaceLandmarker.createFromOptions(
         vision,
         {
           baseOptions: {
-            modelAssetPath:
-              "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task"
+            modelAssetPath: modelPath
           },
 
           runningMode: "IMAGE",
+          numFaces: 1
+        }
+      );
+
+    faceLandmarkerVideo =
+      await FaceLandmarker.createFromOptions(
+        vision,
+        {
+          baseOptions: {
+            modelAssetPath: modelPath
+          },
+
+          runningMode: "VIDEO",
           numFaces: 1
         }
       );
@@ -793,9 +624,7 @@ async function initMediaPipe() {
     console.log(
       "Genze MediaPipe ready"
     );
-
   } catch (error) {
-
     console.error(
       "MediaPipe initialization failed:",
       error
@@ -803,75 +632,441 @@ async function initMediaPipe() {
 
     mediaPipeReady = false;
   }
-}async function checkFaceQuality(imageSource) {
-  if (!mediaPipeReady || !faceLandmarker) {
-    return {
-      ok: false,
-      reason: "Face scanner is still loading."
-    };
-  }
+}
 
-  const result =
-    faceLandmarker.detect(imageSource);
+/* =====================================================
+   FACE QUALITY
+===================================================== */
 
-  const landmarks =
-    result?.faceLandmarks?.[0];
-
-  if (!landmarks) {
-    return {
-      ok: false,
-      reason: "No face detected. Keep your full face inside the oval."
-    };
-  }
-
-  const xs =
-    landmarks.map(point => point.x);
-
-  const ys =
-    landmarks.map(point => point.y);
+function calculateFaceBox(landmarks) {
+  const xs = landmarks.map(p => p.x);
+  const ys = landmarks.map(p => p.y);
 
   const minX = Math.min(...xs);
   const maxX = Math.max(...xs);
+
   const minY = Math.min(...ys);
   const maxY = Math.max(...ys);
 
-  const faceWidth = maxX - minX;
-  const faceHeight = maxY - minY;
+  return {
+    minX,
+    maxX,
+    minY,
+    maxY,
 
-  const centerX = (minX + maxX) / 2;
-  const centerY = (minY + maxY) / 2;
+    width: maxX - minX,
+    height: maxY - minY,
 
-  if (faceWidth < 0.22 || faceHeight < 0.28) {
+    centerX: (minX + maxX) / 2,
+    centerY: (minY + maxY) / 2
+  };
+}
+
+function getFaceQualityFromLandmarks(
+  landmarks
+) {
+  if (!landmarks) {
     return {
       ok: false,
-      reason: "Move closer to the camera."
+      confidence: 0,
+      reason:
+        "No face detected. Keep your full face inside the oval."
     };
   }
 
-  if (faceWidth > 0.75 || faceHeight > 0.82) {
+  const box =
+    calculateFaceBox(landmarks);
+
+  let confidence = 100;
+
+  if (
+    box.width < 0.22 ||
+    box.height < 0.28
+  ) {
     return {
       ok: false,
-      reason: "Move slightly away from the camera."
+      confidence: 35,
+      reason:
+        "Move closer to the camera."
     };
   }
 
   if (
-    Math.abs(centerX - 0.5) > 0.16 ||
-    Math.abs(centerY - 0.5) > 0.18
+    box.width > 0.76 ||
+    box.height > 0.84
   ) {
     return {
       ok: false,
-      reason: "Center your face inside the oval."
+      confidence: 40,
+      reason:
+        "Move slightly away from the camera."
+    };
+  }
+
+  const offX =
+    Math.abs(box.centerX - 0.5);
+
+  const offY =
+    Math.abs(box.centerY - 0.5);
+
+  if (
+    offX > 0.16 ||
+    offY > 0.18
+  ) {
+    return {
+      ok: false,
+      confidence: 45,
+      reason:
+        "Center your face inside the oval."
+    };
+  }
+
+  confidence -= offX * 100;
+  confidence -= offY * 80;
+
+  confidence = Math.max(
+    0,
+    Math.min(100, confidence)
+  );
+
+  return {
+    ok: true,
+    confidence:
+      Math.round(confidence),
+
+    reason:
+      "Face position looks good."
+  };
+}
+
+async function checkImageFaceQuality(
+  imageSource
+) {
+  if (
+    !mediaPipeReady ||
+    !faceLandmarkerImage
+  ) {
+    return {
+      ok: false,
+      confidence: 0,
+      reason:
+        "Face scanner is still loading."
+    };
+  }
+
+  const result =
+    faceLandmarkerImage.detect(
+      imageSource
+    );
+
+  const landmarks =
+    result?.faceLandmarks?.[0];
+
+  return getFaceQualityFromLandmarks(
+    landmarks
+  );
+}
+
+/* =====================================================
+   IMAGE QUALITY
+===================================================== */
+
+function calculateImageQuality(canvas) {
+  const ctx =
+    canvas.getContext(
+      "2d",
+      {
+        willReadFrequently: true
+      }
+    );
+
+  const width =
+    Math.min(canvas.width, 320);
+
+  const height =
+    Math.max(
+      1,
+      Math.round(
+        canvas.height *
+          (width / canvas.width)
+      )
+    );
+
+  const sample =
+    document.createElement("canvas");
+
+  sample.width = width;
+  sample.height = height;
+
+  const sctx =
+    sample.getContext(
+      "2d",
+      {
+        willReadFrequently: true
+      }
+    );
+
+  sctx.drawImage(
+    canvas,
+    0,
+    0,
+    width,
+    height
+  );
+
+  const data =
+    sctx.getImageData(
+      0,
+      0,
+      width,
+      height
+    ).data;
+
+  let total = 0;
+  let totalSq = 0;
+  let count = 0;
+
+  for (
+    let i = 0;
+    i < data.length;
+    i += 16
+  ) {
+    const gray =
+      0.299 * data[i] +
+      0.587 * data[i + 1] +
+      0.114 * data[i + 2];
+
+    total += gray;
+    totalSq += gray * gray;
+    count++;
+  }
+
+  const mean =
+    total / count;
+
+  const variance =
+    totalSq / count -
+    mean * mean;
+
+  if (mean < 45) {
+    return {
+      ok: false,
+      confidence: 35,
+      reason:
+        "Lighting is too dark. Move to brighter light."
+    };
+  }
+
+  if (mean > 225) {
+    return {
+      ok: false,
+      confidence: 40,
+      reason:
+        "Lighting is too bright. Avoid direct glare."
+    };
+  }
+
+  if (variance < 180) {
+    return {
+      ok: false,
+      confidence: 45,
+      reason:
+        "Image looks too soft or blurred. Hold the camera steady."
     };
   }
 
   return {
     ok: true,
-    reason: "Face quality passed."
+    confidence: 90,
+    brightness:
+      Math.round(mean),
+
+    contrast:
+      Math.round(variance)
   };
 }
-let stream = null;
 
+/* =====================================================
+   LIVENESS
+===================================================== */
+
+let livenessRunning = false;
+
+function getHeadPosition(landmarks) {
+  if (!landmarks) {
+    return null;
+  }
+
+  const box =
+    calculateFaceBox(landmarks);
+
+  const nose =
+    landmarks[1] ||
+    landmarks[4] ||
+    landmarks[
+      Math.floor(
+        landmarks.length / 2
+      )
+    ];
+
+  return {
+    centerX:
+      box.centerX,
+
+    noseOffset:
+      nose
+        ? (nose.x - box.centerX) /
+          Math.max(
+            box.width,
+            0.001
+          )
+        : 0
+  };
+}
+
+async function runLivenessCheck() {
+  if (
+    livenessRunning ||
+    !mediaPipeReady ||
+    !faceLandmarkerVideo
+  ) {
+    return false;
+  }
+
+  const video =
+    $("cameraVideo");
+
+  if (
+    !video ||
+    video.readyState < 2
+  ) {
+    return false;
+  }
+
+  livenessRunning = true;
+
+  state.livenessPassed = false;
+
+  setCameraStatus(
+    "Liveness check: keep your face centered, then slowly turn your head slightly left or right.",
+    "checking"
+  );
+
+  const start =
+    performance.now();
+
+  const samples = [];
+
+  while (
+    performance.now() - start <
+    5500
+  ) {
+    try {
+      const now =
+        performance.now();
+
+      const result =
+        faceLandmarkerVideo.detectForVideo(
+          video,
+          now
+        );
+
+      const landmarks =
+        result?.faceLandmarks?.[0];
+
+      if (landmarks) {
+        const quality =
+          getFaceQualityFromLandmarks(
+            landmarks
+          );
+
+        const head =
+          getHeadPosition(
+            landmarks
+          );
+
+        samples.push({
+          time: now,
+          quality,
+          head
+        });
+      }
+    } catch (error) {
+      console.error(
+        "Liveness frame:",
+        error
+      );
+    }
+
+    await new Promise(resolve =>
+      setTimeout(resolve, 180)
+    );
+  }
+
+  livenessRunning = false;
+
+  const good =
+    samples.filter(
+      item => item.quality?.ok
+    );
+
+  if (good.length < 6) {
+    setCameraStatus(
+      "Liveness failed. Keep your full face visible and try again.",
+      "error"
+    );
+
+    return false;
+  }
+
+  const offsets =
+    good
+      .map(
+        item =>
+          item.head?.noseOffset
+      )
+      .filter(
+        value =>
+          Number.isFinite(value)
+      );
+
+  if (!offsets.length) {
+    setCameraStatus(
+      "Liveness could not be confirmed. Try again.",
+      "error"
+    );
+
+    return false;
+  }
+
+  const movement =
+    Math.max(...offsets) -
+    Math.min(...offsets);
+
+  if (movement < 0.045) {
+    setCameraStatus(
+      "Liveness check: please move your head slightly left or right and try again.",
+      "error"
+    );
+
+    return false;
+  }
+
+  state.livenessPassed = true;
+
+  setCameraStatus(
+    "Liveness passed. You can capture your photo now.",
+    "success"
+  );
+
+  return true;
+}
+
+/* =====================================================
+   CAMERA
+===================================================== */
+
+let stream = null;
 
 function requireConsent() {
   if (
@@ -887,21 +1082,17 @@ function requireConsent() {
   return true;
 }
 
-
 async function openCamera() {
   if (!requireConsent()) {
     return;
   }
 
   try {
-
     stream =
-      await navigator
-        .mediaDevices
+      await navigator.mediaDevices
         .getUserMedia({
           video: {
-            facingMode:
-              "user",
+            facingMode: "user",
 
             width: {
               ideal: 1920
@@ -912,26 +1103,32 @@ async function openCamera() {
             }
           },
 
-          audio:
-            false
+          audio: false
         });
 
+    const video =
+      $("cameraVideo");
 
-    $("cameraVideo")
-      .srcObject =
+    video.srcObject =
       stream;
 
-    await $("cameraVideo")
-      .play();
+    await video.play();
 
     $("cameraShell")
-      .classList
-      .remove(
-        "hidden"
-      );
+      .classList.remove("hidden");
 
+    state.livenessPassed = false;
+
+    setCameraStatus(
+      "Camera ready. Starting liveness check...",
+      "checking"
+    );
+
+    setTimeout(
+      runLivenessCheck,
+      700
+    );
   } catch (error) {
-
     console.error(error);
 
     alert(
@@ -940,29 +1137,116 @@ async function openCamera() {
   }
 }
 
-
 function closeCamera() {
   if (stream) {
-
     stream
       .getTracks()
-      .forEach(
-        track =>
-          track.stop()
+      .forEach(track =>
+        track.stop()
       );
 
     stream = null;
   }
 
   $("cameraShell")
-    .classList
-    .add(
-      "hidden"
-    );
+    .classList.add("hidden");
 }
 
+/* =====================================================
+   CAPTURE PROCESSOR
+===================================================== */
 
-async function analyzePhoto(blob) {
+async function processCapturedCanvas(
+  canvas
+) {
+  const imageQuality =
+    calculateImageQuality(
+      canvas
+    );
+
+  if (!imageQuality.ok) {
+    setCameraStatus(
+      imageQuality.reason,
+      "error"
+    );
+
+    return;
+  }
+
+  const faceQuality =
+    await checkImageFaceQuality(
+      canvas
+    );
+
+  if (!faceQuality.ok) {
+    setCameraStatus(
+      faceQuality.reason,
+      "error"
+    );
+
+    return;
+  }
+
+  if (!state.livenessPassed) {
+    setCameraStatus(
+      "Liveness has not passed yet. Open the camera and complete the movement check.",
+      "error"
+    );
+
+    return;
+  }
+
+  setCameraStatus(
+    `Face quality passed (${faceQuality.confidence}%). Preparing analysis...`,
+    "success"
+  );
+
+  canvas.toBlob(
+    async blob => {
+      if (!blob) {
+        return;
+      }
+
+      const previewUrl =
+        URL.createObjectURL(blob);
+
+      $("photoPreview").src =
+        previewUrl;
+
+      $("photoPreview")
+        .classList.remove(
+          "hidden"
+        );
+
+      closeCamera();
+
+      await analyzePhoto(
+        blob,
+        {
+          face_quality:
+            faceQuality.confidence,
+
+          image_quality:
+            imageQuality.confidence,
+
+          liveness: true
+        }
+      );
+    },
+
+    "image/jpeg",
+    0.94
+  );
+}
+
+/* =====================================================
+   SKIN ANALYSIS
+===================================================== */
+
+async function analyzePhoto(
+  blob,
+  clientQuality = {}
+) {
   const form =
     new FormData();
 
@@ -972,195 +1256,150 @@ async function analyzePhoto(blob) {
     "capture.jpg"
   );
 
-  $("cameraStatus")
-    .classList
-    .remove(
-      "hidden"
-    );
+  form.append(
+    "client_quality",
+    JSON.stringify(
+      clientQuality
+    )
+  );
 
-  $("cameraStatus")
-    .textContent =
-    "Analyzing your skin...";
-
+  setCameraStatus(
+    "Analyzing your skin...",
+    "checking"
+  );
 
   try {
-
     const response =
       await fetch(
         "/api/skin-analysis",
         {
-          method:
-            "POST",
-
-          body:
-            form
+          method: "POST",
+          body: form
         }
       );
-
 
     const data =
       await response
         .json()
-        .catch(
-          () => ({})
-        );
-
+        .catch(() => ({}));
 
     if (!response.ok) {
       throw new Error(
         data?.error ||
-        "Skin analysis failed"
+          "Skin analysis failed"
       );
     }
 
+    state.lastAnalysis =
+      data;
 
-    $("cameraStatus")
-      .textContent =
-      "Skin analysis complete.";
+    renderSkinAnalysis(data);
 
+    const source =
+      data.source ||
+      "Genze Skin AI";
 
-    const scores =
-      data.scores || [];
-
-
-    $("cameraResults")
-      .classList
-      .remove(
-        "hidden"
+    const confidence =
+      Number(
+        data.confidence || 0
       );
 
+    setCameraStatus(
+      `${source} complete · confidence ${confidence}%`,
+      "success"
+    );
 
-    $("cameraResults")
-      .innerHTML =
-      scores
-        .slice(0, 8)
-        .map(item => `
-          <div class="skin-result">
-            <strong>
-              ${escapeHtml(
-                item.type
-                  .replaceAll(
-                    "_",
-                    " "
-                  )
-              )}
-            </strong>
+    state.category =
+      "skincare";
 
-            <span>
-              ${escapeHtml(
-                item.score ?? "-"
-              )}
-            </span>
-          </div>
-        `)
-        .join("");
-/* AUTO MATCH PRODUCTS FROM SKIN ANALYSIS */
+    const primaryConcern =
+      data.primary_concern;
 
-const skinTypeItem =
-  scores.find(item => item.type === "skin_type");
-
-const skinType =
-  String(skinTypeItem?.score || "")
-    .toLowerCase();
-
-const detectedTypes =
-  new Set(
-    scores.map(item =>
-      String(item.type || "").toLowerCase()
-    )
-  );
-
-const autoConcerns = [];
-
-if (
-  skinType.includes("oily") ||
-  detectedTypes.has("pore")
-) {
-  autoConcerns.push("pores");
-}
-
-if (detectedTypes.has("acne")) {
-  autoConcerns.push("acne");
-}
-
-if (detectedTypes.has("redness")) {
-  autoConcerns.push("redness");
-}
-
-if (
-  skinType.includes("dry") ||
-  detectedTypes.has("moisture")
-) {
-  autoConcerns.push("hydration");
-}
-
-if (
-  detectedTypes.has("age_spot") ||
-  detectedTypes.has("radiance") ||
-  detectedTypes.has("dark_circle")
-) {
-  autoConcerns.push("brightening");
-}
-
-const uniqueConcerns =
-  [...new Set(autoConcerns)].slice(0, 3);
-
-state.category = "skincare";
-
-const allMatches = [];
-
-for (const concern of uniqueConcerns) {
-  state.concern = concern;
-
-  try {
-    const matchData =
-      await requestProducts("");
-
-    const products =
-      matchData?.products || [];
-
-    for (const product of products) {
-      if (
-        !allMatches.some(
-          existing =>
-            existing.id === product.id
-        )
-      ) {
-        allMatches.push(product);
-      }
+    if (primaryConcern) {
+      state.concern =
+        primaryConcern;
     }
+
+    await loadProducts(
+      "",
+      data
+    );
   } catch (error) {
-    console.error(
-      "Auto skin product match failed:",
-      concern,
-      error
+    console.error(error);
+
+    setCameraStatus(
+      error.message,
+      "error"
     );
   }
 }
 
-state.products =
-  allMatches.slice(0, 6);
+function renderSkinAnalysis(data) {
+  const scores =
+    Array.isArray(data.scores)
+      ? data.scores
+      : [];
 
-renderProducts(
-  state.products
-);
+  $("cameraResults")
+    .classList.remove("hidden");
 
-if (state.products.length) {
-  assistantMessage(
-    `I found ${state.products.length} skincare products matched to your skin analysis.`
-  );
+  const header = `
+    <div class="skin-result-summary">
+
+      <strong>
+        ${escapeHtml(
+          data.source ||
+            "Genze Skin AI"
+        )}
+      </strong>
+
+      <span>
+        Confidence:
+        ${escapeHtml(
+          data.confidence ??
+            "-"
+        )}%
+      </span>
+
+    </div>
+  `;
+
+  const results =
+    scores
+      .slice(0, 10)
+      .map(
+        item => `
+        <div class="skin-result">
+          <strong>
+            ${escapeHtml(
+              String(
+                item.type || ""
+              ).replaceAll(
+                "_",
+                " "
+              )
+            )}
+          </strong>
+
+          <span>
+            ${escapeHtml(
+              item.score ??
+                "-"
+            )}
+          </span>
+        </div>
+      `
+      )
+      .join("");
+
+  $("cameraResults")
+    .innerHTML =
+      header + results;
 }
 
-  } catch (error) {
-
-    console.error(error);
-
-    $("cameraStatus")
-      .textContent =
-      error.message;
-  }
-}
-
+/* =====================================================
+   CAMERA BUTTONS
+===================================================== */
 
 $("openCameraBtn")
   .addEventListener(
@@ -1168,21 +1407,29 @@ $("openCameraBtn")
     openCamera
   );
 
-
 $("closeCameraBtn")
   .addEventListener(
     "click",
     closeCamera
   );
 
-
 $("captureBtn")
   .addEventListener(
     "click",
-    () => {
-
+    async () => {
       const video =
         $("cameraVideo");
+
+      if (
+        !state.livenessPassed
+      ) {
+        setCameraStatus(
+          "Complete the liveness movement first.",
+          "error"
+        );
+
+        return;
+      }
 
       const canvas =
         $("captureCanvas");
@@ -1193,10 +1440,10 @@ $("captureBtn")
       canvas.height =
         video.videoHeight;
 
-
       const context =
         canvas.getContext("2d");
 
+      context.save();
 
       context.translate(
         canvas.width,
@@ -1208,92 +1455,147 @@ $("captureBtn")
         1
       );
 
-     const videoWidth = video.videoWidth;
-const videoHeight = video.videoHeight;
+      context.drawImage(
+        video,
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
 
-const cropScale = 0.65;
+      context.restore();
 
-const cropWidth = videoWidth * cropScale;
-const cropHeight = videoHeight * cropScale;
-
-const sx = (videoWidth - cropWidth) / 2;
-const sy = (videoHeight - cropHeight) / 2;
-
-context.drawImage(
-  video,
-  sx,
-  sy,
-  cropWidth,
-  cropHeight,
-  0,
-  0,
-  canvas.width,
-  canvas.height
-)
-      canvas.toBlob(
-        blob => {
-
-          closeCamera();
-
-          if (!blob) {
-            return;
-          }
-
-          $("photoPreview").src =
-            URL.createObjectURL(
-              blob
-            );
-
-          $("photoPreview")
-            .classList
-            .remove(
-              "hidden"
-            );
-
-          analyzePhoto(blob);
-        },
-
-        "image/jpeg",
-        0.94
+      await processCapturedCanvas(
+        canvas
       );
     }
   );
 
+/* =====================================================
+   UPLOAD
+===================================================== */
 
 $("uploadInput")
   .addEventListener(
     "change",
-    event => {
-
+    async event => {
       if (!requireConsent()) {
         event.target.value = "";
         return;
       }
 
       const file =
-        event.target
-          .files?.[0];
+        event.target.files?.[0];
 
       if (!file) {
         return;
       }
 
+      const img =
+        new Image();
 
-      $("photoPreview").src =
+      const url =
         URL.createObjectURL(
           file
         );
 
-      $("photoPreview")
-        .classList
-        .remove(
-          "hidden"
-        );
+      img.onload =
+        async () => {
+          const canvas =
+            $("captureCanvas");
 
-      analyzePhoto(file);
+          canvas.width =
+            img.naturalWidth;
+
+          canvas.height =
+            img.naturalHeight;
+
+          const ctx =
+            canvas.getContext("2d");
+
+          ctx.drawImage(
+            img,
+            0,
+            0
+          );
+
+          const imageQuality =
+            calculateImageQuality(
+              canvas
+            );
+
+          if (!imageQuality.ok) {
+            setCameraStatus(
+              imageQuality.reason,
+              "error"
+            );
+
+            URL.revokeObjectURL(
+              url
+            );
+
+            return;
+          }
+
+          const faceQuality =
+            await checkImageFaceQuality(
+              img
+            );
+
+          if (!faceQuality.ok) {
+            setCameraStatus(
+              faceQuality.reason,
+              "error"
+            );
+
+            URL.revokeObjectURL(
+              url
+            );
+
+            return;
+          }
+
+          $("photoPreview").src =
+            url;
+
+          $("photoPreview")
+            .classList.remove(
+              "hidden"
+            );
+
+          /*
+            Upload photo cannot prove live presence.
+            It is allowed for analysis, but marked
+            as non-live.
+          */
+
+          await analyzePhoto(
+            file,
+            {
+              face_quality:
+                faceQuality.confidence,
+
+              image_quality:
+                imageQuality.confidence,
+
+              liveness: false,
+
+              uploaded_photo: true
+            }
+          );
+        };
+
+      img.onerror =
+        () => {
+          setCameraStatus(
+            "Photo could not be opened.",
+            "error"
+          );
+        };
+
+      img.src = url;
     }
   );
-
 
 /* =====================================================
    INITIAL

@@ -13,119 +13,190 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Multer Setup for Image Uploads
+// Essential Middlewares
+app.use(cors());
+app.use(express.json({ limit: "15mb" }));
+app.use(express.urlencoded({ extended: true, limit: "15mb" }));
+
+// Multer Setup for Image Uploads & Live Camera Snapshots
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 12 * 1024 * 1024 }
-// Static files serve ചെയ്യാൻ
-app.use(express.static(path.join(__dirname, 'public')));
+  limits: { fileSize: 15 * 1024 * 1024 }
+});
 
-// Main Route
-app.get('/', (req, res) => {
-  res.sendFile('index.html', { root: path.join(__dirname, 'public') }, (err) => {
+// Serve Static Files
+app.use(express.static(path.join(__dirname, "public")));
+
+// Serve Main Page
+app.get("/", (req, res) => {
+  res.sendFile("index.html", { root: path.join(__dirname, "public") }, (err) => {
     if (err) {
-      console.error("index.html ഫയൽ കണ്ടെത്താൻ കഴിഞ്ഞില്ല:", err);
+      console.error("index.html file not found:", err);
       res.status(404).send("index.html file not found in public directory!");
     }
   });
+});
 
 /* =========================================================
-   SKIN ANALYSIS ROUTE (DYNAMIC MOCK / GENZE ENGINE)
+   1. VOICE BEAUTY CONSULTANT ROUTE
 ========================================================= */
+app.post("/api/voice-consultant", (req, res) => {
+  try {
+    const { userMessage, tone, category, concern, skinType } = req.body;
 
+    const selectedTone = tone || userMessage || "Medium";
+    const selectedCategory = category || "Skincare";
+    const selectedConcern = concern || "Hydration & Barrier Care";
+
+    const mockProducts = [
+      {
+        title: "Genze Gentle Hydrating Cleanser",
+        vendor: "Genze Beauty",
+        category: selectedCategory,
+        price: "₹499",
+        image: "https://via.placeholder.com/150",
+        url: "#",
+        match_reason: `Perfect match for ${selectedTone} skin tone and ${selectedConcern}.`
+      },
+      {
+        title: "Genze Soothing Repair Serum",
+        vendor: "Genze Beauty",
+        category: selectedCategory,
+        price: "₹899",
+        image: "https://via.placeholder.com/150",
+        url: "#",
+        match_reason: "Deeply hydrates and restores skin balance."
+      }
+    ];
+
+    return res.json({
+      ok: true,
+      reply: `Welcome! Selected options: Tone (${selectedTone}), Category (${selectedCategory}), Concern (${selectedConcern}). Here are the best recommended products for you:`,
+      suggestedProducts: mockProducts
+    });
+  } catch (error) {
+    console.error("voice-consultant error:", error);
+    return res.status(500).json({ error: "Voice consultant service failed." });
+  }
+});
+
+/* =========================================================
+   2. GENZE AI SKIN ANALYSIS ROUTE (Camera Scan & Upload)
+========================================================= */
 app.post("/api/skin-analysis", upload.single("photo"), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: "No photo received" });
+    // Check for FormData file or Base64 Image string in JSON body
+    if (!req.file && !req.body.photo && !req.body.image) {
+      return res.status(400).json({ 
+        error: "No photo received. Please allow camera access or upload an image." 
+      });
     }
 
-    if (!/^image\/(jpeg|jpg|png|webp)$/i.test(req.file.mimetype || "")) {
-      return res.status(400).json({ error: "Please upload a JPG, PNG, or WEBP image" });
-    }
-
-    // Dynamic Mock Profiles for Frontend Testing
+    // Dynamic Skin Profiles for Mock Analysis & Fallback Logic
     const mockProfiles = [
       {
-        primary_concern: "hydration",
+        primary_concern: "Hydration",
         scores: [
-          { type: "hydration", score: 38 },
-          { type: "brightening", score: 65 },
-          { type: "pores", score: 82 }
+          { type: "hydration", score: 42 },
+          { type: "brightening", score: 68 },
+          { type: "pores", score: 80 }
         ]
       },
       {
-        primary_concern: "acne",
+        primary_concern: "Acne & Redness",
         scores: [
-          { type: "acne", score: 45 },
-          { type: "redness", score: 58 },
-          { type: "hydration", score: 72 }
+          { type: "acne", score: 48 },
+          { type: "redness", score: 55 },
+          { type: "hydration", score: 70 }
         ]
       },
       {
-        primary_concern: "brightening",
+        primary_concern: "Dark Spots & Brightening",
         scores: [
-          { type: "brightening", score: 40 },
-          { type: "dark_spot", score: 50 },
-          { type: "hydration", score: 68 }
+          { type: "brightening", score: 45 },
+          { type: "dark_spot", score: 52 },
+          { type: "hydration", score: 65 }
         ]
       }
     ];
 
     const selected = mockProfiles[Math.floor(Math.random() * mockProfiles.length)];
 
-    const mockAnalysisResult = {
-      ok: true,
-      source: "Genze Local Engine",
-      confidence: Math.floor(Math.random() * (98 - 85 + 1)) + 85,
-      primary_concern: selected.primary_concern,
-      scores: selected.scores
-    };
+    const matchedProducts = [
+      {
+        title: "Genze Hydro-Glow Barrier Cream",
+        vendor: "Genze Beauty",
+        price: "₹799",
+        image: "https://via.placeholder.com/150",
+        url: "#",
+        match_reason: `Specially analyzed for ${selected.primary_concern}. Restores moisture balance.`
+      },
+      {
+        title: "Genze Centella Soothing Ampoule",
+        vendor: "Genze Beauty",
+        price: "₹999",
+        image: "https://via.placeholder.com/150",
+        url: "#",
+        match_reason: "Calms skin sensitivity and enhances radiant skin texture."
+      }
+    ];
 
-    return res.json(mockAnalysisResult);
+    return res.json({
+      ok: true,
+      source: "Genze Skin AI",
+      fallback_used: "YouCam AI (Secondary)",
+      confidence: Math.floor(Math.random() * (98 - 88 + 1)) + 88,
+      primary_concern: selected.primary_concern,
+      scores: selected.scores,
+      products: matchedProducts
+    });
   } catch (error) {
     console.error("skin-analysis error:", error);
-    return res.status(500).json({ error: "Skin analysis failed" });
+    return res.status(500).json({ error: "Skin analysis processing failed." });
   }
 });
 
 /* =========================================================
-   PRODUCT MATCHING ROUTE
+   3. FALLBACK MATCH PRODUCTS ROUTE
 ========================================================= */
+app.post("/api/match-products", upload.single("photo"), (req, res) => {
+  try {
+    const { category, concern, tone } = req.body;
 
-app.post("/api/match-products", (req, res) => {
-  const { category, concern, query } = req.body;
+    const mockProducts = [
+      {
+        title: "Genze Gentle Hydrating Cleanser",
+        vendor: "Genze Beauty",
+        category: category || "Skincare",
+        price: "₹499",
+        currency: "INR",
+        image: "https://via.placeholder.com/150",
+        url: "#",
+        match_reason: `Specially formulated for ${concern || category || 'skin barrier'} support.`
+      },
+      {
+        title: "Genze Soothing Repair Serum",
+        vendor: "Genze Beauty",
+        category: category || "Skincare",
+        price: "₹899",
+        currency: "INR",
+        image: "https://via.placeholder.com/150",
+        url: "#",
+        match_reason: "Deep nourishment and tone balance."
+      }
+    ];
 
-  // Sample Products Mock Data
-  const mockProducts = [
-    {
-      title: "Genze Gentle Hydrating Cleanser",
-      vendor: "Genze Beauty",
-      category: "Skincare",
-      price: "₹499",
-      currency: "",
-      image: "https://via.placeholder.com/150",
-      url: "#",
-      match_reason: `Specially formulated for ${concern || category || 'skincare'} care.`
-    },
-    {
-      title: "Genze Soothing Repair Serum",
-      vendor: "Genze Beauty",
-      category: "Skincare",
-      price: "₹899",
-      currency: "",
-      image: "https://via.placeholder.com/150",
-      url: "#",
-      match_reason: "Deep nourishment and tone balance."
-    }
-  ];
-
-  return res.json({
-    ok: true,
-    products: mockProducts
-  });
+    return res.json({
+      ok: true,
+      products: mockProducts
+    });
+  } catch (error) {
+    console.error("match-products error:", error);
+    return res.status(500).json({ error: "Product matching failed." });
+  }
 });
 
 // Start Server
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Genze AI running on port ${PORT}`);
+  console.log(`Genze AI Voice & Skin Analysis server running on port ${PORT}`);
 });

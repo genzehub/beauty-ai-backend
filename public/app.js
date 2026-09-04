@@ -945,7 +945,102 @@ async function analyzePhoto(blob) {
           </div>
         `)
         .join("");
+/* AUTO MATCH PRODUCTS FROM SKIN ANALYSIS */
 
+const skinTypeItem =
+  scores.find(item => item.type === "skin_type");
+
+const skinType =
+  String(skinTypeItem?.score || "")
+    .toLowerCase();
+
+const detectedTypes =
+  new Set(
+    scores.map(item =>
+      String(item.type || "").toLowerCase()
+    )
+  );
+
+const autoConcerns = [];
+
+if (
+  skinType.includes("oily") ||
+  detectedTypes.has("pore")
+) {
+  autoConcerns.push("pores");
+}
+
+if (detectedTypes.has("acne")) {
+  autoConcerns.push("acne");
+}
+
+if (detectedTypes.has("redness")) {
+  autoConcerns.push("redness");
+}
+
+if (
+  skinType.includes("dry") ||
+  detectedTypes.has("moisture")
+) {
+  autoConcerns.push("hydration");
+}
+
+if (
+  detectedTypes.has("age_spot") ||
+  detectedTypes.has("radiance") ||
+  detectedTypes.has("dark_circle")
+) {
+  autoConcerns.push("brightening");
+}
+
+const uniqueConcerns =
+  [...new Set(autoConcerns)].slice(0, 3);
+
+state.category = "skincare";
+
+const allMatches = [];
+
+for (const concern of uniqueConcerns) {
+  state.concern = concern;
+
+  try {
+    const matchData =
+      await requestProducts("");
+
+    const products =
+      matchData?.products || [];
+
+    for (const product of products) {
+      if (
+        !allMatches.some(
+          existing =>
+            existing.id === product.id
+        )
+      ) {
+        allMatches.push(product);
+      }
+    }
+  } catch (error) {
+    console.error(
+      "Auto skin product match failed:",
+      concern,
+      error
+    );
+  }
+}
+
+state.products =
+  allMatches.slice(0, 6);
+
+renderProducts(
+  state.products
+);
+
+if (state.products.length) {
+  assistantMessage(
+    `I found ${state.products.length} skincare products matched to your skin analysis.`
+  );
+}
 
   } catch (error) {
 

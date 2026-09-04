@@ -1,471 +1,349 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#ffffff" />
 
-  <title>Genze AI — Korean Beauty Assistant</title>
+<head>
+  <meta charset="utf-8">
 
   <meta
-    name="description"
-    content="Genze AI Korean beauty assistant for personalized product matching and routines."
-  />
+    name="viewport"
+    content="width=device-width,initial-scale=1,viewport-fit=cover"
+  >
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <meta
+    name="theme-color"
+    content="#f6f5ef"
+  >
+
+  <title>
+    Genze AI Beauty Consultant
+  </title>
+
+  <link
+    rel="preconnect"
+    href="https://fonts.googleapis.com"
+  >
+
+  <link
+    rel="preconnect"
+    href="https://fonts.gstatic.com"
+    crossorigin
+  >
 
   <link
     href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap"
     rel="stylesheet"
   >
 
-  <link rel="stylesheet" href="style.css" />
+  <link
+    rel="stylesheet"
+    href="style.css"
+  >
 </head>
+
 
 <body>
 
-  <!-- HEADER -->
-  <header class="site-header">
+  <main class="page">
 
-    <a
-      class="brand"
-      href="https://genzehub.co.in"
-      target="_blank"
-      rel="noreferrer"
-    >
-      <span class="brand-mark">G</span>
-      <span>GENZE AI</span>
-    </a>
+    <!-- =========================================
+         VOICE BEAUTY CONSULTANT
+    ========================================== -->
 
-    <span class="live-pill">
-      <span class="live-dot"></span>
-      Live assistant
-    </span>
+    <section class="consultant">
 
-  </header>
+      <header class="consultant-header">
 
+        <div>
+          <h1>
+            Voice Beauty Consultant
+          </h1>
 
-  <main>
-
-    <!-- HERO -->
-    <section class="hero">
-
-      <p class="eyebrow">
-        POWERED FOR GENZE HUB
-      </p>
-
-      <h1>
-        Your Korean beauty guide,<br>
-        ready to help.
-      </h1>
-
-      <p class="hero-copy">
-        Personal recommendations, easy routines, and clearer product
-        choices—any time your customer needs them.
-      </p>
-
-    </section>
-
-
-    <!-- ROW 1 -->
-    <!-- Voice Consultant + Product Matcher -->
-
-    <section class="grid two">
-
-
-      <!-- VOICE BEAUTY CONSULTANT -->
-      <article class="card">
-
-        <div class="card-kicker">
-          Voice Beauty Consultant
+          <p id="consultantStatus">
+            Choose your skin tone to begin
+          </p>
         </div>
 
-        <h2>
-          Step 1 · Tell me your skin tone
-        </h2>
-
         <button
-          class="secondary"
           id="voiceBtn"
+          class="voice-button"
           type="button"
         >
           Enable voice
         </button>
 
+      </header>
 
-        <div class="assistant-row">
 
-          <span class="assistant-avatar">
+      <!-- CHAT -->
+
+      <div
+        id="chat"
+        class="chat"
+      >
+
+        <div class="assistant-message">
+
+          <span class="avatar">
             G
           </span>
 
-          <p id="assistantPrompt">
-            Welcome to Genze Hub. First, what is your skin tone:
-            fair, light, medium, tan, or deep?
-          </p>
+          <div class="bubble assistant">
+            Welcome to Genze Hub. First,
+            choose your skin tone.
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <!-- PRODUCTS INSIDE CONSULTANT -->
+
+      <div
+        id="consultantProducts"
+        class="consultant-products hidden"
+      ></div>
+
+
+      <!-- CONTROLS -->
+
+      <div class="consultant-controls">
+
+        <div class="control-row">
+
+          <label for="concernSelect">
+            Choose a concern
+          </label>
+
+          <select id="concernSelect">
+            <option value="">
+              See all beauty concerns
+            </option>
+          </select>
 
         </div>
 
 
-        <div class="tone-row">
-
-          <button data-tone="Fair" type="button">
-            Fair
-          </button>
-
-          <button data-tone="Light" type="button">
-            Light
-          </button>
-
-          <button data-tone="Medium" type="button">
-            Medium
-          </button>
-
-          <button data-tone="Tan" type="button">
-            Tan
-          </button>
-
-          <button data-tone="Deep" type="button">
-            Deep
-          </button>
-
-        </div>
-
-
-        <div class="input-row">
+        <div class="search-row">
 
           <button
-            class="icon-btn"
             id="micBtn"
             type="button"
-            aria-label="Voice input"
+            class="mic-button"
+            aria-label="Voice search"
           >
             🎙
           </button>
 
           <input
-            id="toneInput"
-            placeholder="Say or type your skin tone…"
-          />
+            id="searchInput"
+            placeholder="Search all products..."
+          >
 
           <button
-            class="icon-btn"
-            id="toneSend"
+            id="searchBtn"
             type="button"
-            aria-label="Send"
+            class="send-button"
           >
             ↑
           </button>
 
         </div>
-<div id="toneProductSection" class="hidden">
-  <h3>Matching products for your skin tone</h3>
-
-  <div id="toneProductResults" class="product-grid"></div>
-
-  <div id="step2Section" class="hidden">
-    <h3>Step 2 · Choose your skin type</h3>
-
-    <div class="tone-row">
-      <button type="button" data-skin-type="Normal">Normal</button>
-      <button type="button" data-skin-type="Dry">Dry</button>
-      <button type="button" data-skin-type="Oily">Oily</button>
-      <button type="button" data-skin-type="Combination">Combination</button>
-      <button type="button" data-skin-type="Sensitive">Sensitive</button>
-    </div>
-  </div>
-</div>
-      </article>
 
 
-      <!-- FIND MY MATCHING PRODUCTS -->
-      <article class="card camera-card">
+        <!-- TONE -->
 
-        <div class="tool-icon">
-          ◎
+        <div class="tone-section">
+
+          <div class="section-label">
+            Skin tone
+          </div>
+
+          <div
+            id="toneButtons"
+            class="choice-row"
+          >
+            <button data-tone="Fair">Fair</button>
+            <button data-tone="Light">Light</button>
+            <button data-tone="Medium">Medium</button>
+            <button data-tone="Tan">Tan</button>
+            <button data-tone="Deep">Deep</button>
+          </div>
+
         </div>
 
+
+        <!-- CATEGORY -->
+
+        <div
+          id="categoryButtons"
+          class="category-row"
+        >
+
+          <button
+            data-category="skincare"
+            class="active"
+          >
+            Skincare
+          </button>
+
+          <button
+            data-category="makeup"
+          >
+            Makeup
+          </button>
+
+          <button
+            data-category="haircare"
+          >
+            Haircare
+          </button>
+
+          <button
+            data-category="fragrance"
+          >
+            Fragrance
+          </button>
+
+        </div>
+
+
+        <!-- QUICK CONCERNS -->
+
+        <div
+          id="quickConcerns"
+          class="quick-grid"
+        ></div>
+
+      </div>
+
+    </section>
+
+
+    <!-- =========================================
+         CAMERA - SEPARATE FEATURE
+    ========================================== -->
+
+    <section class="camera-card">
+
+      <div>
+        <p class="eyebrow">
+          AI SKIN ANALYSIS
+        </p>
+
         <h2>
-          Find My Matching Products
+          Scan your skin
         </h2>
 
         <p class="muted">
-          Take one clear, front-facing photo. Keep your forehead,
-          chin, and both cheeks visible, look straight ahead,
-          and remove glasses.
+          Camera analysis is separate from
+          the Voice Beauty Consultant.
         </p>
+      </div>
 
 
-        <label class="consent">
+      <label class="consent">
 
-          <input
-            type="checkbox"
-            id="consentCheckbox"
-          >
-
-          <span>
-            I consent to securely send this photo for AI skin analysis.
-          </span>
-
-        </label>
-
-
-        <div class="camera-actions">
-
-          <button
-            class="primary"
-            id="openCameraBtn"
-            type="button"
-          >
-            Open Phone Camera
-          </button>
-
-
-          <label class="upload-btn">
-
-            Upload Photo
-
-            <input
-              id="uploadInput"
-              type="file"
-              accept="image/*"
-              hidden
-            >
-
-          </label>
-
-        </div>
-
-
-        <!-- CAMERA -->
-        <div
-          class="camera-shell hidden"
-          id="cameraShell"
+        <input
+          type="checkbox"
+          id="consentCheckbox"
         >
 
-          <video
-            id="cameraVideo"
-            autoplay
-            playsinline
-            muted
-          ></video>
+        <span>
+          I consent to securely send this
+          photo for AI skin analysis.
+        </span>
+
+      </label>
 
 
-          <div
-            class="face-guide"
-            aria-hidden="true"
-          >
-
-            <div class="face-oval"></div>
-
-            <span>
-              Center your face inside the guide
-            </span>
-
-          </div>
-
-
-          <button
-            class="capture-btn"
-            id="captureBtn"
-            type="button"
-            aria-label="Capture photo"
-          ></button>
-
-
-          <button
-            class="close-camera"
-            id="closeCameraBtn"
-            type="button"
-          >
-            ×
-          </button>
-
-        </div>
-
-
-        <canvas
-          id="captureCanvas"
-          class="hidden"
-        ></canvas>
-
-
-        <img
-          id="photoPreview"
-          class="photo-preview hidden"
-          alt="Captured selfie preview"
-        />
-
-
-        <!-- ANALYSIS STATUS -->
-        <div
-          class="analysis-status hidden"
-          id="analysisStatus"
-          role="status"
-        ></div>
-
-
-        <!-- RESULTS -->
-        <div
-          class="results hidden"
-          id="results"
-        >
-
-          <h3>
-            Your skin analysis
-          </h3>
-
-          <div
-            id="concernChips"
-            class="chips"
-          ></div>
-
-
-          <h3>
-            Best matching products
-          </h3>
-
-          <div
-            id="productResults"
-            class="product-grid"
-          ></div>
-
-        </div>
-
-
-        <p class="legal">
-          Product matching uses appearance analysis and is not a
-          medical diagnosis. Results may vary with lighting and
-          camera quality.
-        </p>
-
-      </article>
-
-    </section>
-
-
-    <!-- TOOLS INTRO -->
-    <section class="tools-intro">
-
-      <p class="eyebrow">
-        GENZE AI TOOLS
-      </p>
-
-      <h2>
-        Personal beauty, made clear.
-      </h2>
-
-      <p>
-        Real AI skin analysis can be connected to your
-        Genze Hub product catalog.
-      </p>
-
-    </section>
-
-
-    <!-- ROW 2 -->
-    <<!-- Routine Builder -->
-
-    <section class="grid two">
-
-      <!-- AM / PM ROUTINE BUILDER -->
-      <article class="card">
-
-        <div class="tool-icon">
-          ☀
-        </div>
-
-        <h2>
-          AM/PM Routine Builder
-        </h2>
-
-
-        <label>
-          Skin type
-
-          <select id="skinType">
-
-            <option>Normal</option>
-            <option>Dry</option>
-            <option>Oily</option>
-            <option>Combination</option>
-            <option>Sensitive</option>
-
-          </select>
-
-        </label>
-
-
-        <label>
-          Goal
-
-          <select id="goal">
-
-            <option>Hydration</option>
-            <option>Brightening</option>
-            <option>Texture</option>
-            <option>Pores</option>
-            <option>Acne care</option>
-            <option>Anti-aging</option>
-
-          </select>
-
-        </label>
-
-
-        <label>
-          Season
-
-          <select id="season">
-
-            <option>All year</option>
-            <option>Summer</option>
-            <option>Winter</option>
-            <option>Monsoon</option>
-
-          </select>
-
-        </label>
-
+      <div class="camera-actions">
 
         <button
-          class="primary"
-          id="routineBtn"
+          id="openCameraBtn"
+          class="dark-button"
           type="button"
         >
-          Build my routine
+          Open Phone Camera
         </button>
 
 
-        <div
-          class="output hidden"
-          id="routineOutput"
-        ></div>
+        <label class="upload-button">
 
-      </article>
+          Upload Photo
+
+          <input
+            id="uploadInput"
+            type="file"
+            accept="image/*"
+            hidden
+          >
+
+        </label>
+
+      </div>
+
+
+      <div
+        id="cameraShell"
+        class="camera-shell hidden"
+      >
+
+        <video
+          id="cameraVideo"
+          autoplay
+          playsinline
+          muted
+        ></video>
+
+        <div class="face-guide">
+          <div class="face-oval"></div>
+        </div>
+
+        <button
+          id="captureBtn"
+          class="capture-button"
+          type="button"
+        ></button>
+
+        <button
+          id="closeCameraBtn"
+          class="close-camera"
+          type="button"
+        >
+          ×
+        </button>
+
+      </div>
+
+
+      <canvas
+        id="captureCanvas"
+        class="hidden"
+      ></canvas>
+
+
+      <img
+        id="photoPreview"
+        class="photo-preview hidden"
+        alt="Skin analysis preview"
+      >
+
+
+      <div
+        id="cameraStatus"
+        class="camera-status hidden"
+      ></div>
+
+
+      <div
+        id="cameraResults"
+        class="camera-results hidden"
+      ></div>
 
     </section>
 
   </main>
-
-
-  <!-- FOOTER -->
-  <footer>
-
-    <span>
-      GENZE HUB · AUTHENTIC K-BEAUTY
-    </span>
-
-    <a
-      href="https://genzehub.co.in"
-      target="_blank"
-      rel="noreferrer"
-    >
-      Visit store ↗
-    </a>
-
-  </footer>
 
 
   <script src="app.js"></script>

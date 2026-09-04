@@ -712,12 +712,15 @@ if (
     }
 
     if (
-      [
-        "hand cream",
-        "body lotion",
-        "body wash",
-        "shower gel",
-        "perfume shower"
+     [
+  "hand cream",
+  "body lotion",
+  "body wash",
+  "shower gel",
+  "perfume shower",
+  "shampoo",
+  "hair treatment"
+]
       ].some(hasStrong)
     ) {
       return 0;

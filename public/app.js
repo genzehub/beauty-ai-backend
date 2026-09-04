@@ -760,7 +760,50 @@ $("micBtn")
 /* =====================================================
    CAMERA
 ===================================================== */
+/* =====================================================
+   MEDIAPIPE FACE ENGINE
+===================================================== */
 
+let faceLandmarker = null;
+let mediaPipeReady = false;
+
+async function initMediaPipe() {
+  try {
+    const vision =
+      await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+      );
+
+    faceLandmarker =
+      await FaceLandmarker.createFromOptions(
+        vision,
+        {
+          baseOptions: {
+            modelAssetPath:
+              "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task"
+          },
+
+          runningMode: "IMAGE",
+          numFaces: 1
+        }
+      );
+
+    mediaPipeReady = true;
+
+    console.log(
+      "Genze MediaPipe ready"
+    );
+
+  } catch (error) {
+
+    console.error(
+      "MediaPipe initialization failed:",
+      error
+    );
+
+    mediaPipeReady = false;
+  }
+}
 let stream = null;
 
 

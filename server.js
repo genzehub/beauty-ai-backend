@@ -17,17 +17,17 @@ const PORT = process.env.PORT || 3000;
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 12 * 1024 * 1024 }
-});
+// Static files serve ചെയ്യാൻ
+app.use(express.static(path.join(__dirname, 'public')));
 
-app.use(cors());
-app.use(express.json({ limit: "3mb" }));
-
-// Static Files & Root Route Setup
-app.use(express.static(path.join(__dirname, "public")));
-
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
+// Main Route
+app.get('/', (req, res) => {
+  res.sendFile('index.html', { root: path.join(__dirname, 'public') }, (err) => {
+    if (err) {
+      console.error("index.html ഫയൽ കണ്ടെത്താൻ കഴിഞ്ഞില്ല:", err);
+      res.status(404).send("index.html file not found in public directory!");
+    }
+  });
 
 /* =========================================================
    SKIN ANALYSIS ROUTE (DYNAMIC MOCK / GENZE ENGINE)

@@ -432,11 +432,16 @@ const CONCERNS = {
     ],
 
     vanilla: [
-      "vanilla",
-      "amber",
-      "sweet",
-      "warm"
-    ],
+  "vanilla",
+  "amber",
+  "sweet",
+  "warm",
+  "musk",
+  "woody",
+  "oriental",
+  "creamy",
+  "powdery"
+],
 
     longlasting: [
       "eau de parfum",

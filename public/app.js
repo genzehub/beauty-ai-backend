@@ -855,6 +855,10 @@ async function analyzePhoto(blob, clientQuality = {}) {
 
     if (data.primary_concern) {
       state.concern = data.primary_concern;
+      const concernSelect = $("concernSelect");
+      if (concernSelect) {
+        concernSelect.value = data.primary_concern;
+      }
     }
 
     await loadProducts("", data);
@@ -868,9 +872,20 @@ function renderSkinAnalysis(data) {
   const resultsBox = $("cameraResults");
   if (!resultsBox) return;
 
-  const scores = Array.isArray(data.scores) ? data.scores : [];
   resultsBox.classList.remove("hidden");
 
+  if (data.ok && data.primary_concern) {
+    resultsBox.innerHTML = `
+      <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 15px; color: #1b5e20;">
+        <h4 style="margin: 0 0 8px 0;">Analysis Successful!</h4>
+        <p style="margin: 4px 0;"><strong>Primary Concern:</strong> ${escapeHtml(data.primary_concern.toUpperCase())}</p>
+        <p style="margin: 4px 0;"><strong>Confidence:</strong> ${escapeHtml(data.confidence)}%</p>
+      </div>
+    `;
+    return;
+  }
+
+  const scores = Array.isArray(data.scores) ? data.scores : [];
   const header = `
     <div class="skin-result-summary">
       <strong>${escapeHtml(data.source || "Genze Skin AI")}</strong>
@@ -1005,6 +1020,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  /* Single Combined Upload Handler */
   const uploadInput = $("uploadInput");
   if (uploadInput) {
     uploadInput.addEventListener("change", async event => {
@@ -1021,28 +1037,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
       img.onload = async () => {
         const canvas = $("captureCanvas");
-        if (!canvas) return;
+        if (canvas) {
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
 
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0);
 
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0);
+          const imageQuality = calculateImageQuality(canvas);
+          if (!imageQuality.ok) {
+            setCameraStatus(imageQuality.reason, "error");
+            URL.revokeObjectURL(url);
+            return;
+          }
 
-        const imageQuality = calculateImageQuality(canvas);
-
-        if (!imageQuality.ok) {
-          setCameraStatus(imageQuality.reason, "error");
-          URL.revokeObjectURL(url);
-          return;
-        }
-
-        const faceQuality = await checkImageFaceQuality(img);
-
-        if (!faceQuality.ok) {
-          setCameraStatus(faceQuality.reason, "error");
-          URL.revokeObjectURL(url);
-          return;
+          const faceQuality = await checkImageFaceQuality(img);
+          if (!faceQuality.ok) {
+            setCameraStatus(faceQuality.reason, "error");
+            URL.revokeObjectURL(url);
+            return;
+          }
         }
 
         const preview = $("photoPreview");
@@ -1052,8 +1066,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         await analyzePhoto(file, {
-          face_quality: faceQuality.confidence,
-          image_quality: imageQuality.confidence,
           liveness: false,
           uploaded_photo: true
         });
@@ -1066,63 +1078,7 @@ document.addEventListener("DOMContentLoaded", () => {
       img.src = url;
     });
   }
-/* Custom Genze AI Skin Analysis Upload Handler */
-  const consentCheckbox = document.getElementById("consentCheckbox");
-  const uploadInput = document.getElementById("uploadInput");
-  const cameraResults = document.getElementById("cameraResults");
-  const concernSelect = document.getElementById("concernSelect");
 
-  if (uploadInput) {
-    uploadInput.addEventListener("change", async (event) => {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      if (consentCheckbox && !consentCheckbox.checked) {
-        alert("Please check the consent box before analyzing your skin.");
-        uploadInput.value = "";
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append("photo", file);
-
-      try {
-        if (cameraResults) {
-          cameraResults.classList.remove("hidden");
-          cameraResults.innerHTML = "<p>Analyzing skin with Genze Engine...</p>";
-        }
-
-        const response = await fetch("/api/skin-analysis", {
-          method: "POST",
-          body: formData,
-        });
-
-        const data = await response.json();
-
-        if (data.ok) {
-          if (cameraResults) {
-            cameraResults.innerHTML = `
-              <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 15px; color: #1b5e20;">
-                <h4 style="margin: 0 0 8px 0;">Analysis Successful!</h4>
-                <p style="margin: 4px 0;"><strong>Primary Concern:</strong> ${data.primary_concern.toUpperCase()}</p>
-                <p style="margin: 4px 0;"><strong>Confidence:</strong> ${data.confidence}%</p>
-              </div>
-            `;
-          }
-
-          if (concernSelect) {
-            concernSelect.value = data.primary_concern;
-            concernSelect.dispatchEvent(new Event("change"));
-          }
-        } else {
-          alert("Analysis error: " + (data.error || "Failed to analyze skin"));
-        }
-      } catch (err) {
-        console.error("Analysis upload error:", err);
-        alert("Backend server running ആണോ എന്ന് പരിശോധിക്കുക (http://localhost:3000)");
-      }
-    });
-  }
   /* Initialization calls */
   renderConcernOptions();
   updateStatus();

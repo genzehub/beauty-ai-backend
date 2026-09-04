@@ -21,7 +21,13 @@ const upload = multer({
 
 app.use(cors());
 app.use(express.json({ limit: "3mb" }));
+
+// Static Files & Root Route Setup
 app.use(express.static(path.join(__dirname, "public")));
+
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
 
 /* =========================================================
    SKIN ANALYSIS ROUTE (DYNAMIC MOCK / GENZE ENGINE)
@@ -80,6 +86,43 @@ app.post("/api/skin-analysis", upload.single("photo"), async (req, res) => {
     console.error("skin-analysis error:", error);
     return res.status(500).json({ error: "Skin analysis failed" });
   }
+});
+
+/* =========================================================
+   PRODUCT MATCHING ROUTE
+========================================================= */
+
+app.post("/api/match-products", (req, res) => {
+  const { category, concern, query } = req.body;
+
+  // Sample Products Mock Data
+  const mockProducts = [
+    {
+      title: "Genze Gentle Hydrating Cleanser",
+      vendor: "Genze Beauty",
+      category: "Skincare",
+      price: "₹499",
+      currency: "",
+      image: "https://via.placeholder.com/150",
+      url: "#",
+      match_reason: `Specially formulated for ${concern || category || 'skincare'} care.`
+    },
+    {
+      title: "Genze Soothing Repair Serum",
+      vendor: "Genze Beauty",
+      category: "Skincare",
+      price: "₹899",
+      currency: "",
+      image: "https://via.placeholder.com/150",
+      url: "#",
+      match_reason: "Deep nourishment and tone balance."
+    }
+  ];
+
+  return res.json({
+    ok: true,
+    products: mockProducts
+  });
 });
 
 // Start Server

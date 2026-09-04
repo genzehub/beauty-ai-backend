@@ -151,19 +151,6 @@ async function loadAllShopifyProducts() {
           }
         `;
 
-        const data = await jsonFetch(
-          `https://${SHOPIFY_DOMAIN}/api/2024-01/graphql.json`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              // Standard Storefront Token header:
-              "X-Shopify-Storefront-Access-Token": SHOPIFY_TOKEN
-            },
-            body: JSON.stringify({ query, variables: { cursor } })
-          }
-        );
-
         if (data?.errors?.length) {
           throw new Error(data.errors[0]?.message || "Shopify GraphQL error");
         }

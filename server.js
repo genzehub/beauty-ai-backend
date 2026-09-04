@@ -276,7 +276,6 @@ const CATEGORY_TERMS = {
   ],
 
   makeup: [
-    "makeup",
     "foundation",
     "cushion",
     "concealer",

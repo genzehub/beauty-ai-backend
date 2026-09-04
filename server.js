@@ -662,18 +662,28 @@ function matchCatalog({
       };
     })
 
-    .filter(product => {
-      if (query) {
-        return product.match_score > 0;
-      }
+   .filter(product => {
+  // Search box: allow any matching product
+  if (query) {
+    return queryScore(product, query) > 0;
+  }
 
-      return (
-        categoryScore(
-          product,
-          category
-        ) > 0
-      );
-    })
+  // Product must belong to selected category
+  if (categoryScore(product, category) <= 0) {
+    return false;
+  }
+
+  // If a concern is selected, product MUST match that concern
+  if (concern) {
+    return concernScore(
+      product,
+      category,
+      concern
+    ) > 0;
+  }
+
+  return true;
+})
 
     .sort(
       (a, b) =>

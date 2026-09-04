@@ -1066,7 +1066,63 @@ document.addEventListener("DOMContentLoaded", () => {
       img.src = url;
     });
   }
+/* Custom Genze AI Skin Analysis Upload Handler */
+  const consentCheckbox = document.getElementById("consentCheckbox");
+  const uploadInput = document.getElementById("uploadInput");
+  const cameraResults = document.getElementById("cameraResults");
+  const concernSelect = document.getElementById("concernSelect");
 
+  if (uploadInput) {
+    uploadInput.addEventListener("change", async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      if (consentCheckbox && !consentCheckbox.checked) {
+        alert("Please check the consent box before analyzing your skin.");
+        uploadInput.value = "";
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("photo", file);
+
+      try {
+        if (cameraResults) {
+          cameraResults.classList.remove("hidden");
+          cameraResults.innerHTML = "<p>Analyzing skin with Genze Engine...</p>";
+        }
+
+        const response = await fetch("/api/skin-analysis", {
+          method: "POST",
+          body: formData,
+        });
+
+        const data = await response.json();
+
+        if (data.ok) {
+          if (cameraResults) {
+            cameraResults.innerHTML = `
+              <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 15px; color: #1b5e20;">
+                <h4 style="margin: 0 0 8px 0;">Analysis Successful!</h4>
+                <p style="margin: 4px 0;"><strong>Primary Concern:</strong> ${data.primary_concern.toUpperCase()}</p>
+                <p style="margin: 4px 0;"><strong>Confidence:</strong> ${data.confidence}%</p>
+              </div>
+            `;
+          }
+
+          if (concernSelect) {
+            concernSelect.value = data.primary_concern;
+            concernSelect.dispatchEvent(new Event("change"));
+          }
+        } else {
+          alert("Analysis error: " + (data.error || "Failed to analyze skin"));
+        }
+      } catch (err) {
+        console.error("Analysis upload error:", err);
+        alert("Backend server running ആണോ എന്ന് പരിശോധിക്കുക (http://localhost:3000)");
+      }
+    });
+  }
   /* Initialization calls */
   renderConcernOptions();
   updateStatus();

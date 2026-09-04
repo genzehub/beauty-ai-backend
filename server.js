@@ -418,11 +418,12 @@ const CONCERNS = {
     ],
 
     dry: [
-      "dry hair",
-      "moisture",
-      "hydrating",
-      "repair"
-    ],
+  "dry hair",
+  "moisture",
+  "hydrating",
+  "repair"
+],
+
 
     damaged: [
       "damaged",

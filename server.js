@@ -171,10 +171,19 @@ function matchProductsByTerms(catalog, terms = [], limit = 6) {
   return scored.slice(0, limit).map((s) => s.item);
 }
 
-function formatMatchReason(concern, category) {
+function formatMatchReason(concern, category, tone) {
+  if (concern === 'vanilla' && !tone) {
+    tone = concern;
+    concern = null;
+  }
+
+  if (tone && category) {
+    return `Matches your shade '${tone}' and product type '${category}'.`;
+  }
   if (concern && category) {
     return `Matches your concern '${concern}' and product type '${category}'.`;
   }
+  if (tone) return `Matched for shade/tone: ${tone}.`;
   if (concern) return `Formulated for ${concern} care.`;
   if (category) return `Recommended option for ${category}.`;
   return 'Personalized Korean skincare match.';

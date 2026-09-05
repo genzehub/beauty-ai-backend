@@ -180,12 +180,15 @@ function formatMatchReason(concern, category, tone) {
   if (tone && category) {
     return `Matches your shade '${tone}' and product type '${category}'.`;
   }
+
   if (concern && category) {
     return `Matches your concern '${concern}' and product type '${category}'.`;
   }
+
   if (tone) return `Matched for shade/tone: ${tone}.`;
   if (concern) return `Formulated for ${concern} care.`;
   if (category) return `Recommended option for ${category}.`;
+
   return 'Personalized Korean skincare match.';
 }
 
@@ -193,11 +196,19 @@ function formatMatchReason(concern, category, tone) {
 app.post('/api/skin-analysis', upload.single('photo'), async (req, res) => {
   try {
     const catalog = await loadAllShopifyProducts();
+
     const primaryConcern = req.body?.concern || 'hydration';
-    
-    const matchedProducts = matchProductsByTerms(catalog, [primaryConcern, 'skincare'], 6).map((prod) => ({
+    const category = req.body?.category || 'makeup';
+
+    const terms = [primaryConcern, category].filter(Boolean);
+
+    const matchedProducts = matchProductsByTerms(
+      catalog,
+      terms,
+      6
+    ).map((prod) => ({
       ...prod,
-      match_reason: `Analyzed concern: ${primaryConcern}. Formulated to soothe and balance.`
+      match_reason: `Analyzed concern: ${primaryConcern}. Tailored ${category} match.`
     }));
 
     return res.json({
@@ -214,10 +225,14 @@ app.post('/api/skin-analysis', upload.single('photo'), async (req, res) => {
       items: matchedProducts,
       data: matchedProducts
     });
+
   } catch (error) {
     console.error('skin-analysis error:', error);
-    return res.status(500).json({ error: 'Skin analysis failed' });
+    return res.status(500).json({
+      error: 'Skin analysis failed'
+    });
   }
+});
 });
 
 // 2. Product Matching Route

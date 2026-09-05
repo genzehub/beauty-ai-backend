@@ -486,7 +486,41 @@
 
   </script>
 
+<script src="./app.js"></script>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        // Handle Skin Tone Clicks
+        document.querySelectorAll("[data-tone]").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const tone = btn.dataset.tone || btn.textContent.trim();
+            document.querySelectorAll("[data-tone]").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
 
+            if (window.matchProducts) {
+              const res = await window.matchProducts({}, tone, "");
+              window.renderProducts(res);
+            }
+          });
+        });
+
+        // Handle Quick Concerns Clicks
+        document.querySelectorAll(".concern-btn, [data-concern], .quick-action").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const concern = btn.dataset.concern || btn.textContent.trim();
+            const activeToneBtn = document.querySelector("[data-tone].active");
+            const tone = activeToneBtn ? activeToneBtn.dataset.tone : "Medium";
+
+            if (window.matchProducts) {
+              const res = await window.matchProducts({}, tone, concern);
+              window.renderProducts(res);
+            }
+          });
+        });
+      });
+    </script>
+
+  </body>
+</html>
 </body>
 
 </html>

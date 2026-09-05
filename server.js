@@ -220,7 +220,7 @@ app.post('/api/match-products', upload.single('photo'), async (req, res) => {
     const terms = [tone, category, concern, query].filter(Boolean);
     const matched = matchProductsByTerms(catalog, terms, 6).map((prod) => ({
       ...prod,
-      match_reason: formatMatchReason(concern || tone, category)
+      match_reason: formatMatchReason(concern, category, tone)
     }));
 
     return res.json({
@@ -245,7 +245,7 @@ app.post('/api/voice-consultant', async (req, res) => {
     const terms = [tone, category, concern, userMessage].filter(Boolean);
     const matched = matchProductsByTerms(catalog, terms, 6).map((prod) => ({
       ...prod,
-      match_reason: formatMatchReason(concern || tone, category)
+      match_reason: formatMatchReason(concern, category, tone)
     }));
 
     return res.json({

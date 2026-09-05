@@ -851,8 +851,7 @@ async function analyzePhoto(blob, clientQuality = {}) {
       "success"
     );
 
-    state.category = "skincare";
-
+    
     if (data.primary_concern) {
       state.concern = data.primary_concern;
       const concernSelect = $("concernSelect");

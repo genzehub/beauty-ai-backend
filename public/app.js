@@ -829,7 +829,7 @@ async function analyzePhoto(blob, clientQuality = {}) {
   setCameraStatus("Analyzing your skin...", "checking");
 
   try {
-    const response = await fetch("/api/skin-analysis", {
+    const response = await fetch("/api/match-products", {
       method: "POST",
       body: form
     });
